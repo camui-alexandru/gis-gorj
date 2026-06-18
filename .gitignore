@@ -1,0 +1,18 @@
+# Fișiere inutile pentru deployment
+backend/
+frontend/
+DATA/*.py
+DATA/*.txt
+DATA/PARCELE.zip
+DATA/CONSTRUCTII.zip
+DATA/UAT.zip
+DATA/SIT NATURA.zip
+DATA/LIMITA INTRAVILAN.zip
+DATA/*.bak
+DATA/*.dwg
+DATA/*.dwl
+DATA/*.dwl2
+DATA/Transgaz_SHP/
+DATA/PARCELE_INDEX.geojson
+serve.ps1
+start.bat

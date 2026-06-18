@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GIS Gorj — Portal Cartografic</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css"/>
+<style>
+:root{
+  --bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;
+  --accent:#2a7fff;--accent2:#1db8c2;--text:#d8e4f0;--muted:#5a7090;
+  --green:#2ecc71;--orange:#e8a838;--red:#e74c3c;--purple:#9b59b6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── TOPBAR ─────────────────────────────────────────────────────── */
+.topbar{height:48px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;flex-shrink:0;z-index:1000}
+.tb-brand{display:flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid var(--border);height:100%;min-width:240px}
+.tb-brand .logo{font-size:20px}
+.tb-brand h1{font-size:14px;font-weight:700;line-height:1.2}
+.tb-brand h1 small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.tb-tools{display:flex;align-items:center;gap:2px;padding:0 10px;height:100%;border-right:1px solid var(--border)}
+.tool-btn{background:none;border:1px solid transparent;color:var(--muted);padding:5px 9px;border-radius:5px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:.15s}
+.tool-btn:hover{background:var(--panel2);color:var(--text);border-color:var(--border)}
+.tool-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tool-sep{width:1px;background:var(--border);height:24px;margin:0 4px}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px;padding:0 14px}
+.basemap-select{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:5px;font-size:12px;cursor:pointer;outline:none}
+.btn-add{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.btn-add:hover{background:#1a6fef}
+.coord-display{font-size:11px;color:var(--muted);font-family:monospace;min-width:180px;text-align:right}
+
+/* ── MAIN ──────────────────────────────────────────────────────── */
+.main{display:flex;flex:1;overflow:hidden;position:relative}
+
+/* ── LEFT SIDEBAR ──────────────────────────────────────────────── */
+.sidebar{width:270px;min-width:270px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:width .2s}
+.sidebar.collapsed{width:0;min-width:0}
+.sb-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-header span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.sb-search{padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none}
+.sb-search input:focus{border-color:var(--accent)}
+.layer-tree{flex:1;overflow-y:auto;padding:6px 0}
+.cat-header{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+.cat-header:hover{background:var(--panel2)}
+.cat-icon{font-size:14px;width:20px;text-align:center}
+.cat-name{font-size:12px;font-weight:700;color:var(--text);flex:1}
+.cat-count{font-size:10px;color:var(--muted);background:var(--bg);padding:1px 6px;border-radius:8px}
+.cat-arrow{font-size:10px;color:var(--muted);transition:.2s}
+.cat-body{overflow:hidden;transition:max-height .25s}
+.cat-body.closed{max-height:0}
+.layer-row{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 28px;border-bottom:1px solid #0d1828;cursor:default}
+.layer-row:hover{background:var(--panel2)}
+.layer-row.selected{background:#0f2545}
+.layer-vis{cursor:pointer;font-size:12px;color:var(--muted);flex-shrink:0;width:14px;text-align:center}
+.layer-vis.on{color:var(--accent2)}
+.layer-color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;cursor:pointer}
+.layer-label{flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer-actions{display:flex;gap:2px;opacity:0}
+.layer-row:hover .layer-actions{opacity:1}
+.la-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:3px}
+.la-btn:hover{color:var(--text);background:var(--border)}
+.badge{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;color:#fff;flex-shrink:0}
+.sb-empty{padding:20px 12px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center}
+.sb-footer{border-top:1px solid var(--border);padding:8px 10px;display:flex;gap:6px}
+.sf-btn{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:5px;border-radius:5px;cursor:pointer;font-size:11px;text-align:center}
+.sf-btn:hover{color:var(--text);border-color:var(--accent)}
+
+/* ── MAP ───────────────────────────────────────────────────────── */
+#map{flex:1;background:#0a1020}
+
+/* ── ATTRIBUTE PANEL ───────────────────────────────────────────── */
+.attr-panel{position:absolute;right:14px;bottom:36px;width:310px;max-height:400px;background:var(--panel);border:1px solid var(--border);border-radius:8px;z-index:500;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.attr-panel.hidden{display:none}
+.attr-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);border-left:3px solid var(--accent)}
+.attr-hdr-info .attr-layer{font-size:13px;font-weight:700}
+.attr-hdr-info .attr-geom{font-size:10px;color:var(--muted);margin-top:1px}
+.btn-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 6px;border-radius:3px}
+.btn-x:hover{color:var(--red)}
+.attr-scroll{overflow-y:auto;max-height:320px}
+.attr-empty{padding:14px;font-size:12px;color:var(--muted);text-align:center}
+.attr-tbl{border-collapse:collapse;font-size:12px;width:100%}
+.attr-tbl tr{border-bottom:1px solid #0d1828}
+.attr-tbl tr:hover{background:var(--panel2)}
+.attr-tbl td:first-child{padding:5px 10px;color:var(--muted);font-weight:600;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.attr-tbl td:last-child{padding:5px 10px;color:var(--text);word-break:break-word}
+
+/* ── STATUS BAR ────────────────────────────────────────────────── */
+.statusbar{height:24px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0;font-size:11px;color:var(--muted);z-index:1000}
+.sb-item{display:flex;align-items:center;gap:4px}
+.sb-item span{color:var(--text)}
+#scaleDisplay{color:var(--accent2)}
+
+/* ── MODAL ─────────────────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:3000;backdrop-filter:blur(3px)}
+.overlay.hidden{display:none}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;width:520px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-hdr h2{font-size:15px;font-weight:700}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.drop-zone{border:2px dashed var(--border);border-radius:8px;padding:28px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--bg)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:#0d1e35}
+.drop-zone.has-file{border-color:var(--green);border-style:solid}
+.drop-icon,.file-icon{font-size:32px;margin-bottom:8px}
+.drop-text{color:var(--muted);font-size:13px;margin-bottom:3px}
+.drop-hint{color:#3a5070;font-size:11px}
+.file-info{color:var(--accent2);font-size:13px;font-weight:600;margin-bottom:3px}
+.file-size,.warn-dbf{font-size:11px;color:#e8a838}
+.form-row{display:flex;flex-direction:column;gap:5px}
+.form-row label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.form-row input[type=text],.form-row select{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:7px 10px;color:var(--text);font-size:13px;outline:none}
+.form-row input[type=text]:focus,.form-row select:focus{border-color:var(--accent)}
+.presets{display:flex;flex-wrap:wrap;gap:5px}
+.preset-btn{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--muted);padding:5px 10px;font-size:11px;cursor:pointer;transition:.15s}
+.preset-btn.active,.preset-btn:hover{border-color:var(--accent);color:var(--text);background:var(--panel2)}
+.color-row{flex-direction:row!important;align-items:center}
+.color-row label{flex:1}
+.color-row input[type=color]{width:30px;height:30px;border:none;border-radius:5px;cursor:pointer;background:none;padding:0}
+.color-hex{font-size:11px;color:var(--muted);font-family:monospace;width:56px}
+.err-msg{background:#2a1010;border:1px solid #5a2020;border-radius:5px;padding:7px 10px;color:#ff8a8a;font-size:12px}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+.btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:5px;cursor:pointer;font-size:12px}
+.btn-cancel:hover{border-color:var(--muted);color:var(--text)}
+.btn-ok{background:var(--accent);border:none;color:#fff;padding:7px 18px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700}
+.btn-ok:hover:not(:disabled){background:#1a6fef}
+.btn-ok:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── CADASTRAL SEARCH ──────────────────────────────────────────── */
+.search-modal{width:540px}
+.cad-search-row{display:flex;gap:8px}
+.cad-search-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px 10px;color:var(--text);font-size:13px;outline:none}
+.cad-search-row input:focus{border-color:var(--accent)}
+.cad-search-row button{background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap}
+.cad-search-row button:hover{background:#1a6fef}
+.search-hint{font-size:11px;color:var(--muted);line-height:1.6}
+.search-results{display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto}
+.result-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;cursor:pointer;transition:.15s}
+.result-item:hover{border-color:var(--accent);background:var(--panel2)}
+.result-item.highlighted{border-color:var(--accent2);background:#0d2230}
+.ri-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ri-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;color:#fff;background:var(--accent);flex-shrink:0}
+.ri-name{font-size:13px;font-weight:700;color:var(--text)}
+.ri-layer{font-size:11px;color:var(--muted)}
+.ri-props{font-size:11px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.ri-prop span{color:var(--accent2)}
+.no-results{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+.search-fields-row{display:flex;gap:8px;align-items:flex-end}
+.search-fields-row .form-row{flex:1}
+.sf-label{font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.highlight-pulse{animation:hpulse 1.5s ease-out}
+@keyframes hpulse{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+
+/* ── PARCELA LABELS ────────────────────────────────────────────── */
+.cad-label{
+  background:transparent!important;border:none!important;box-shadow:none!important;
+  padding:0!important;margin:0!important;
+  font-size:9px;font-weight:700;color:#fff;
+  text-shadow:0 0 2px #000,0 0 2px #000,0 0 2px #000;
+  pointer-events:none!important;white-space:nowrap;
+  transform:translate(-50%,-50%);
+}
+
+.uat-label{
+  background:transparent!important;border:none!important;box-shadow:none!important;
+  padding:0!important;margin:0!important;
+  font-size:11px;font-weight:800;color:#fff;
+  text-shadow:0 0 3px #000,0 0 3px #000,0 0 4px #000,0 0 4px #000;
+  pointer-events:none!important;white-space:nowrap;
+  transform:translate(-50%,-50%);letter-spacing:.3px;
+}
+
+/* ── SEARCH HIGHLIGHT ──────────────────────────────────────────── */
+@keyframes searchPulse{
+  0%{stroke-opacity:1;stroke-width:5}
+  50%{stroke-opacity:.4;stroke-width:8}
+  100%{stroke-opacity:1;stroke-width:5}
+}
+.search-hl-path{animation:searchPulse 1s ease-in-out infinite}
+.search-marker-pin{
+  width:24px;height:24px;border-radius:50%;
+  background:#ffeb3b;border:3px solid #fff;
+  box-shadow:0 0 0 3px #ffeb3b88,0 0 16px #ffeb3b;
+  animation:pinPulse 1s ease-in-out infinite;
+}
+@keyframes pinPulse{
+  0%{box-shadow:0 0 0 3px #ffeb3b88,0 0 16px #ffeb3b}
+  50%{box-shadow:0 0 0 8px #ffeb3b33,0 0 32px #ffeb3b}
+  100%{box-shadow:0 0 0 3px #ffeb3b88,0 0 16px #ffeb3b}
+}
+
+/* ── COLOR PICKER POPUP ────────────────────────────────────────── */
+.color-popup{position:absolute;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;z-index:2000;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.color-popup.hidden{display:none}
+.cp-swatches{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cp-swatch{width:22px;height:22px;border-radius:4px;cursor:pointer;border:2px solid transparent}
+.cp-swatch:hover,.cp-swatch.sel{border-color:#fff}
+.cp-custom{width:100%;height:24px;border:none;border-radius:4px;cursor:pointer;background:none;padding:0}
+
+/* ── SCROLLBAR ─────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── LEAFLET OVERRIDES ─────────────────────────────────────────── */
+.leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-zoom a:hover{background:var(--panel2)!important}
+.leaflet-control-scale-line{background:rgba(14,22,36,.8)!important;border-color:var(--muted)!important;color:var(--text)!important;font-size:10px!important}
+.leaflet-measure-resultpopup{background:var(--panel)!important;border-color:var(--border)!important;color:var(--text)!important}
+</style>
+</head>
+<body>
+
+<!-- ── TOPBAR ─────────────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="tb-brand">
+    <span class="logo">🗺</span>
+    <h1>GIS Gorj <small>Portal Cartografic Județean</small></h1>
+  </div>
+  <div class="tb-tools">
+    <button class="tool-btn active" id="toolPan" onclick="setTool('pan')" title="Navigare">✋ Pan</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="toolMeasDist" onclick="setTool('measDist')" title="Măsoară distanță">📏 Distanță</button>
+    <button class="tool-btn" id="toolMeasArea" onclick="setTool('measArea')" title="Măsoară suprafață">⬡ Suprafață</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="toolZoomIn" onclick="map.zoomIn()" title="Zoom In">＋</button>
+    <button class="tool-btn" id="toolZoomOut" onclick="map.zoomOut()" title="Zoom Out">－</button>
+    <button class="tool-btn" onclick="map.setView([44.95,23.37],10)" title="Extindere inițială">⌂</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" onclick="toggleSidebar()" title="Arată/ascunde straturi">☰ Straturi</button>
+  </div>
+  <div class="tb-right">
+    <select class="basemap-select" onchange="switchBasemap(this.value)" title="Hartă de bază">
+      <option value="gmaps">🗺 Google Maps</option>
+      <option value="gsat">🛰 Google Satelit</option>
+      <option value="ghybrid">🛰 Google Hibrid</option>
+      <option value="osm">🗺 OSM Standard</option>
+      <option value="topo">🏔 OSM Topo</option>
+      <option value="satellite">🛰 Satelit ESRI</option>
+      <option value="dark">🌑 Dark</option>
+      <option value="none">☐ Fără fond</option>
+    </select>
+    <button class="tool-btn" onclick="openCadSearch()" title="Caută număr cadastral">🔎 Căutare cadastrală</button>
+    <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
+    <div class="coord-display" id="coordDisplay">—</div>
+  </div>
+</div>
+
+<!-- ── MAIN ───────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <span>Straturi harta</span>
+      <span id="totalCount" style="font-size:11px;color:var(--muted)">0 straturi</span>
+    </div>
+    <div class="sb-search">
+      <input type="text" id="layerSearch" placeholder="🔍 Caută strat..." oninput="filterLayers(this.value)"/>
+    </div>
+    <div class="layer-tree" id="layerTree"></div>
+    <div class="sb-footer">
+      <button class="sf-btn" onclick="setAllVisible(true)">👁 Arată tot</button>
+      <button class="sf-btn" onclick="setAllVisible(false)">🚫 Ascunde tot</button>
+      <button class="sf-btn" onclick="zoomToAll()">⛶ Extindere</button>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- ATTRIBUTE PANEL -->
+  <div class="attr-panel hidden" id="attrPanel">
+    <div class="attr-hdr" id="attrHdr">
+      <div class="attr-hdr-info">
+        <div class="attr-layer" id="attrLayerName">—</div>
+        <div class="attr-geom" id="attrGeomType">—</div>
+      </div>
+      <button class="btn-x" onclick="closeAttr()">✕</button>
+    </div>
+    <div class="attr-scroll" id="attrScroll"></div>
+  </div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div class="sb-item">📍 <span id="statusCoords">—</span></div>
+  <div class="sb-item">🔭 Scară: <span id="scaleDisplay">—</span></div>
+  <div class="sb-item">📐 Zoom: <span id="zoomDisplay">10</span></div>
+  <div class="sb-item" id="featureCountBar">⬡ <span>0 entități selectate</span></div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="overlay hidden" id="modal" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>Adaugă strat nou</h2>
+      <button class="btn-x" onclick="closeUpload()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="drop-zone" id="dropZone"
+        onclick="document.getElementById('fileInput').click()"
+        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+        <div id="dropContent">
+          <div class="drop-icon">📂</div>
+          <div class="drop-text">Trage fișierul(ele) aici sau click</div>
+          <div class="drop-hint">.shp (+ .dbf/.prj opțional) &nbsp;·&nbsp; .zip (SHP arhivat) &nbsp;·&nbsp; .dxf</div>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept=".shp,.dbf,.prj,.zip,.dxf" multiple style="display:none" onchange="handleFileSelect(event)"/>
+
+      <div class="form-row">
+        <label>Sistem de coordonate (CRS)</label>
+        <select id="crsSelect">
+          <option value="auto">🔍 Detectare automată (recomandat)</option>
+          <option value="stereo70">📐 Stereo70 — EPSG:31700 (sistem românesc)</option>
+          <option value="wgs84">🌐 WGS84 — EPSG:4326 (lat/lon)</option>
+          <option value="web">🗺 Web Mercator — EPSG:3857</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Categorie</label>
+        <select id="catSelect">
+          <option value="cadastru">📍 Cadastru</option>
+          <option value="urbanism">🏘 Urbanism (PUG/PUZ/PUD)</option>
+          <option value="drumuri">🛣 Drumuri</option>
+          <option value="utilitati" selected>⚡ Rețele Utilități</option>
+          <option value="transport">🔵 Rețele Transport</option>
+          <option value="mediu">🌿 Mediu &amp; Arii protejate</option>
+          <option value="altele">📋 Altele</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Nume strat</label>
+        <input type="text" id="layerNameInput" placeholder="ex: Parcele cadastrale sector 1"/>
+      </div>
+
+      <div class="form-row">
+        <label>Tip rețea / preset culoare</label>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="form-row color-row">
+        <label>Culoare</label>
+        <input type="color" id="colorInput" value="#2a7fff" oninput="document.getElementById('colorHex').textContent=this.value"/>
+        <span class="color-hex" id="colorHex">#2a7fff</span>
+      </div>
+
+      <div id="errMsg" class="err-msg" style="display:none"></div>
+      <div id="progressBar" class="progress-bar" style="display:none"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeUpload()">Anulează</button>
+        <button class="btn-ok" id="btnOk" onclick="submitUpload()" disabled>Încarcă strat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CADASTRAL SEARCH MODAL -->
+<div class="overlay hidden" id="cadModal" onclick="handleCadOverlay(event)">
+  <div class="modal search-modal">
+    <div class="modal-hdr">
+      <h2>🔎 Căutare cadastrală</h2>
+      <button class="btn-x" onclick="closeCadSearch()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="search-fields-row">
+        <div class="form-row">
+          <label>UAT / Localitate</label>
+          <input type="text" id="cadUat" placeholder="ex: Târgu Jiu, Rovinari…" oninput="cadLiveSearch()" />
+        </div>
+        <div class="form-row">
+          <label>Număr cadastral</label>
+          <input type="text" id="cadNr" placeholder="ex: 12345" oninput="cadLiveSearch()" onkeydown="if(event.key==='Enter')cadLiveSearch()" />
+        </div>
+      </div>
+
+      <div class="search-hint" id="cadHint">
+        Caută în toate straturile încărcate. Câmpurile detectate automat: <code>NR_CAD</code>, <code>UAT</code>, <code>SIRUTA</code>, <code>NR_TOP</code> și altele.
+        Lasă UAT gol pentru căutare în tot județul.
+      </div>
+
+      <div class="search-results" id="cadResults"></div>
+    </div>
+  </div>
+</div>
+
+<!-- COLOR POPUP -->
+<div class="color-popup hidden" id="colorPopup">
+  <div class="cp-swatches" id="cpSwatches"></div>
+  <input type="color" class="cp-custom" id="cpCustom" title="Culoare personalizată"/>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+const CATEGORIES = [
+  { id:'cadastru',  icon:'📍', label:'Cadastru',               color:'#e8a838' },
+  { id:'urbanism',  icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
+  { id:'drumuri',   icon:'🛣', label:'Drumuri',                 color:'#e74c3c' },
+  { id:'utilitati', icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
+  { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
+  { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
+  { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
+];
+
+const PRESETS = [
+  { label:'Apă',          color:'#2196f3', cat:'utilitati' },
+  { label:'Canalizare',   color:'#795548', cat:'utilitati' },
+  { label:'Gaz',          color:'#ff9800', cat:'utilitati' },
+  { label:'Electricitate',color:'#ffeb3b', cat:'utilitati' },
+  { label:'Telecom',      color:'#9c27b0', cat:'utilitati' },
+  { label:'Termoficare',  color:'#f44336', cat:'utilitati' },
+  { label:'Parcele',      color:'#e8a838', cat:'cadastru'  },
+  { label:'Imobile',      color:'#f39c12', cat:'cadastru'  },
+  { label:'PUG',          color:'#8e44ad', cat:'urbanism'  },
+  { label:'PUZ',          color:'#6c3483', cat:'urbanism'  },
+  { label:'Drum naț.',    color:'#e74c3c', cat:'drumuri'   },
+  { label:'Drum jud.',    color:'#e67e22', cat:'drumuri'   },
+  { label:'Drum com.',    color:'#f1c40f', cat:'drumuri'   },
+];
+
+const CAT_STATE = {}; // { catId: { open: bool } }
+CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
+
+let layers = []; // { id, name, cat, color, format, geojson, visible, leafletLayer }
+let selectedFile = null, selectedFiles = {};
+let activeTool = 'pan';
+let measureLayer = null;
+let measurePoints = [];
+let isMeasuring = false;
+let colorPopupTarget = null;
+let filterText = '';
+
+const SWATCHES = ['#2a7fff','#1db8c2','#2ecc71','#e8a838','#e74c3c','#9b59b6',
+                  '#f39c12','#1abc9c','#3498db','#e74c3c','#f1c40f','#95a5a6',
+                  '#795548','#ff9800','#ffeb3b','#9c27b0','#2196f3','#4caf50',
+                  '#8e44ad','#6c3483','#27ae60','#d35400','#c0392b','#7f8c8d'];
+
+// ═══════════════════════════════════════════════════════════════════
+// MAP INIT
+// ═══════════════════════════════════════════════════════════════════
+const map = L.map('map', { zoomControl: false, maxZoom: 22 }).setView([44.95, 23.37], 10);
+L.control.zoom({ position:'bottomright' }).addTo(map);
+L.control.scale({ imperial:false, position:'bottomleft' }).addTo(map);
+
+const GM = 'https://mt{s}.google.com/vt/lyrs=';
+const BASEMAPS = {
+  osm:        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',   { attribution:'© OpenStreetMap', opacity:.8, subdomains:'abc', maxNativeZoom:19, maxZoom:22 }),
+  gmaps:      L.tileLayer(GM+'r&x={x}&y={y}&z={z}', { attribution:'© Google Maps',    opacity:.9, subdomains:'0123', maxNativeZoom:22, maxZoom:22 }),
+  gsat:       L.tileLayer(GM+'s&x={x}&y={y}&z={z}', { attribution:'© Google Satellite',opacity:.9, subdomains:'0123', maxNativeZoom:22, maxZoom:22 }),
+  ghybrid:    L.tileLayer(GM+'y&x={x}&y={y}&z={z}', { attribution:'© Google Hybrid',   opacity:.9, subdomains:'0123', maxNativeZoom:22, maxZoom:22 }),
+  topo:       L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',     { attribution:'© OpenTopoMap',  opacity:.85, subdomains:'abc', maxNativeZoom:17, maxZoom:22 }),
+  satellite:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'© ESRI', opacity:.9, maxNativeZoom:19, maxZoom:22 }),
+  dark:       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution:'© CartoDB', opacity:.9, subdomains:'abcd', maxNativeZoom:19, maxZoom:22 }),
+  none:       L.tileLayer(''),
+};
+let currentBasemap = BASEMAPS.gmaps;
+currentBasemap.addTo(map);
+
+function switchBasemap(key) {
+  map.removeLayer(currentBasemap);
+  currentBasemap = BASEMAPS[key] || BASEMAPS.osm;
+  currentBasemap.addTo(map);
+  currentBasemap.bringToBack();
+}
+
+// Coord & scale display
+map.on('mousemove', e => {
+  const {lat, lng} = e.latlng;
+  document.getElementById('coordDisplay').textContent = `${lat.toFixed(5)}°N  ${lng.toFixed(5)}°E`;
+  document.getElementById('statusCoords').textContent = `${lat.toFixed(5)}°N  ${lng.toFixed(5)}°E`;
+});
+map.on('zoomend moveend', updateScale);
+function updateScale() {
+  const z = map.getZoom();
+  document.getElementById('zoomDisplay').textContent = z;
+  const scales = {0:'1:500M',1:'1:250M',2:'1:150M',3:'1:70M',4:'1:35M',5:'1:15M',
+                  6:'1:10M',7:'1:4M',8:'1:2M',9:'1:1M',10:'1:500K',11:'1:250K',
+                  12:'1:150K',13:'1:70K',14:'1:35K',15:'1:15K',16:'1:8K',
+                  17:'1:4K',18:'1:2K',19:'1:1K',20:'1:500'};
+  document.getElementById('scaleDisplay').textContent = scales[z] || '—';
+}
+updateScale();
+
+// ═══════════════════════════════════════════════════════════════════
+// TOOLS
+// ═══════════════════════════════════════════════════════════════════
+const measureDrawn = [];
+let measLineLayer = null, measLabel = null;
+
+function setTool(tool) {
+  // Clear previous measure
+  if (activeTool !== tool && (activeTool === 'measDist' || activeTool === 'measArea')) endMeasure();
+
+  activeTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tool' + tool.charAt(0).toUpperCase() + tool.slice(1));
+  if (el) el.classList.add('active');
+
+  if (tool === 'pan') {
+    map.dragging.enable();
+    map.getContainer().style.cursor = '';
+  } else {
+    map.dragging.enable();
+    map.getContainer().style.cursor = 'crosshair';
+    startMeasure(tool);
+  }
+}
+
+const measPoints = [];
+let measPath = null, measAreaPath = null, measPopup = null;
+
+function startMeasure(type) {
+  measPoints.length = 0;
+  if (measPath) { map.removeLayer(measPath); measPath = null; }
+  if (measAreaPath) { map.removeLayer(measAreaPath); measAreaPath = null; }
+  if (measPopup) { measPopup.remove(); measPopup = null; }
+
+  map.on('click', onMeasClick);
+  map.on('dblclick', onMeasDblClick);
+}
+
+function endMeasure() {
+  map.off('click', onMeasClick);
+  map.off('dblclick', onMeasDblClick);
+  measPoints.length = 0;
+  if (measPath) { map.removeLayer(measPath); measPath = null; }
+  if (measAreaPath) { map.removeLayer(measAreaPath); measAreaPath = null; }
+}
+
+function onMeasClick(e) {
+  measPoints.push(e.latlng);
+  if (measPath) map.removeLayer(measPath);
+  if (measPoints.length > 1) {
+    measPath = L.polyline(measPoints, { color:'#fff', weight:2, dashArray:'6,4', opacity:.9 }).addTo(map);
+  }
+  if (activeTool === 'measArea' && measPoints.length > 2) {
+    if (measAreaPath) map.removeLayer(measAreaPath);
+    measAreaPath = L.polygon(measPoints, { color:'#2a7fff', weight:1, fillOpacity:.2 }).addTo(map);
+  }
+  updateMeasLabel();
+}
+
+function onMeasDblClick(e) {
+  L.DomEvent.stop(e);
+  if (measPopup) measPopup.remove();
+  const result = getMeasResult();
+  measPopup = L.popup({ closeButton:true, className:'leaflet-measure-resultpopup' })
+    .setLatLng(e.latlng)
+    .setContent(`<b>${activeTool === 'measDist' ? 'Distanță' : 'Suprafață'}</b><br>${result}`)
+    .openOn(map);
+  measPoints.length = 0;
+  if (measPath) { map.removeLayer(measPath); measPath = null; }
+  if (measAreaPath) { map.removeLayer(measAreaPath); measAreaPath = null; }
+}
+
+function getMeasResult() {
+  if (activeTool === 'measDist') {
+    let d = 0;
+    for (let i = 1; i < measPoints.length; i++) d += measPoints[i-1].distanceTo(measPoints[i]);
+    return d > 1000 ? (d/1000).toFixed(3) + ' km' : d.toFixed(1) + ' m';
+  } else {
+    const pts = measPoints.map(p => [p.lat, p.lng]);
+    let area = 0;
+    for (let i = 0, j = pts.length-1; i < pts.length; j = i++) {
+      const xi = pts[i][1] * Math.PI/180 * 6371000 * Math.cos(pts[i][0]*Math.PI/180);
+      const yi = pts[i][0] * Math.PI/180 * 6371000;
+      const xj = pts[j][1] * Math.PI/180 * 6371000 * Math.cos(pts[j][0]*Math.PI/180);
+      const yj = pts[j][0] * Math.PI/180 * 6371000;
+      area += (xi * yj - xj * yi);
+    }
+    area = Math.abs(area / 2);
+    return area > 10000 ? (area/10000).toFixed(4) + ' ha' : area.toFixed(1) + ' m²';
+  }
+}
+
+function updateMeasLabel() { /* label shown in real-time during measure */ }
+
+// ═══════════════════════════════════════════════════════════════════
+// LAYER MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+function addLayer(layer) {
+  layers.push(layer);
+  layer.leafletLayer = buildLeafletLayer(layer);
+  if (layer.visible !== false) {
+    layer.leafletLayer.addTo(map);
+    try {
+      const bounds = layer.leafletLayer.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding:[40,40], maxZoom:17 });
+    } catch(e){}
+  }
+  renderTree();
+  scheduleLabels();
+}
+
+// Detectează dacă un layer are câmpul NATIONAL_C (cadastral)
+function hasNationalC(layer) {
+  const sample = layer.geojson.features[0]?.properties || {};
+  return Object.keys(sample).some(k => k.toUpperCase() === 'NATIONAL_C');
+}
+
+function getNationalC(props) {
+  for (const k of Object.keys(props)) {
+    if (k.toUpperCase() === 'NATIONAL_C') return String(props[k] ?? '').trim();
+  }
+  return null;
+}
+
+function buildLeafletLayer(layer) {
+  const withLabels = hasNationalC(layer);
+  const style = () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
+  const ptLayer = (f, ll) => L.circleMarker(ll, { radius:6, color:layer.color, fillColor:layer.color, fillOpacity:.75, weight:2 });
+
+  const onEach = (f, lyr) => {
+    lyr.on('click', e => { L.DomEvent.stopPropagation(e); if (activeTool === 'pan') showAttr(f, layer); });
+    lyr.on('mouseover', function() { this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 }); });
+    lyr.on('mouseout',  function() { this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 }); });
+  };
+
+  const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach });
+  if (layer._withLabels === undefined) layer._withLabels = withLabels;
+  return geojsonLayer;
+}
+
+// ── LABEL ENGINE ─────────────────────────────────────────────────
+// Etichete dinamice: randăm DOAR features vizibile în viewport la zoom ≥ 15
+const labelLayerGroup = L.layerGroup().addTo(map);
+const LABEL_MIN_ZOOM = 18;
+
+function refreshLabels() {
+  labelLayerGroup.clearLayers();
+  const zoom = map.getZoom();
+  const bounds = map.getBounds();
+
+  for (const layer of layers) {
+    if (!layer.visible || !layer._withLabels) continue;
+
+    // Fiecare layer poate avea un zoom minim și un câmp propriu
+    const minZoom = layer._labelMinZoom ?? LABEL_MIN_ZOOM;
+    if (zoom < minZoom) continue;
+
+    const labelField = layer._labelField; // câmp custom (ex: 'name')
+
+    for (const feature of layer.geojson.features) {
+      const props = feature.properties || {};
+      const text = labelField ? (props[labelField] || '') : getNationalC(props);
+      if (!text) continue;
+
+      let center;
+      try {
+        const tmp = L.geoJSON(feature);
+        const b = tmp.getBounds();
+        if (!b.isValid() || !bounds.intersects(b)) continue;
+        center = b.getCenter();
+      } catch(e) { continue; }
+
+      const icon = L.divIcon({
+        className: labelField ? 'uat-label' : 'cad-label',
+        html: text,
+        iconSize: null,
+        iconAnchor: null,
+      });
+      L.marker(center, { icon, interactive: false, keyboard: false })
+        .addTo(labelLayerGroup);
+    }
+  }
+}
+
+// Refreshăm etichetele la zoom și la mutare (cu debounce)
+let labelTimer = null;
+function scheduleLabels() {
+  clearTimeout(labelTimer);
+  labelTimer = setTimeout(refreshLabels, 250);
+}
+map.on('zoomend moveend', scheduleLabels);
+
+function updateLayerStyle(id) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer) return;
+  layer.leafletLayer.setStyle({ color:layer.color, fillColor:layer.color });
+  layer.leafletLayer.eachLayer(lyr => {
+    if (lyr.options && lyr.setStyle) lyr.setStyle({ color:layer.color, fillColor:layer.color });
+    else if (lyr.options) { lyr.options.color = layer.color; lyr.options.fillColor = layer.color; }
+  });
+}
+
+function toggleLayer(id) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer) return;
+  layer.visible = !layer.visible;
+  layer.visible ? layer.leafletLayer.addTo(map) : map.removeLayer(layer.leafletLayer);
+  renderTree();
+  scheduleLabels();
+}
+
+function removeLayer(id) {
+  const idx = layers.findIndex(l => l.id === id);
+  if (idx === -1 || layers[idx].static) return;
+  map.removeLayer(layers[idx].leafletLayer);
+  layers.splice(idx, 1);
+  renderTree();
+  scheduleLabels();
+}
+
+function zoomToLayer(id) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer) return;
+  try { map.fitBounds(layer.leafletLayer.getBounds(), { padding:[40,40], maxZoom:17 }); } catch(e){}
+}
+
+function setAllVisible(v) {
+  layers.forEach(l => {
+    l.visible = v;
+    v ? l.leafletLayer.addTo(map) : map.removeLayer(l.leafletLayer);
+  });
+  renderTree();
+}
+
+function zoomToAll() {
+  const visible = layers.filter(l => l.visible);
+  if (!visible.length) return;
+  try {
+    const group = L.featureGroup(visible.map(l => l.leafletLayer));
+    map.fitBounds(group.getBounds(), { padding:[40,40] });
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LAYER TREE RENDER
+// ═══════════════════════════════════════════════════════════════════
+function filterLayers(q) { filterText = q.toLowerCase(); renderTree(); }
+
+function renderTree() {
+  const tree = document.getElementById('layerTree');
+  const q = filterText;
+  let total = 0;
+
+  tree.innerHTML = CATEGORIES.map(cat => {
+    const catLayers = layers.filter(l => l.cat === cat.id && (!q || l.name.toLowerCase().includes(q)));
+    if (q && !catLayers.length) return '';
+    total += catLayers.length;
+    const open = CAT_STATE[cat.id].open;
+    const visCount = catLayers.filter(l => l.visible).length;
+
+    return `
+    <div class="cat-block" id="cat_${cat.id}">
+      <div class="cat-header" onclick="toggleCat('${cat.id}')">
+        <span class="cat-icon">${cat.icon}</span>
+        <span class="cat-name">${cat.label}</span>
+        ${catLayers.length ? `<span class="cat-count">${visCount}/${catLayers.length}</span>` : ''}
+        <span class="cat-arrow">${open ? '▾' : '▸'}</span>
+      </div>
+      <div class="cat-body ${open ? '' : 'closed'}">
+        ${catLayers.length === 0 ? `<div style="padding:6px 28px;font-size:11px;color:var(--muted)">— niciun strat —</div>` : ''}
+        ${[...catLayers].reverse().map(l => `
+          <div class="layer-row" id="lr_${l.id}">
+            <span class="layer-vis ${l.visible ? 'on' : ''}" onclick="toggleLayer('${l.id}')" title="${l.visible ? 'Ascunde' : 'Arată'}">
+              ${l.visible ? '👁' : '○'}
+            </span>
+            <span class="layer-color-dot" style="background:${l.color}" onclick="openColorPopup('${l.id}', event)" title="Schimbă culoare"></span>
+            <span class="layer-label" title="${l.name}">${l.name}</span>
+            <span class="badge" style="background:${l.format==='SHP'?'#1a8a6a':l.format==='DXF'?'#8a6a1a':'#3a5a8a'}">${l.format}</span>
+            <div class="layer-actions">
+              ${l._isTile ? '' : `<button class="la-btn" onclick="zoomToLayer('${l.id}')" title="Zoom la strat">⛶</button>`}
+              ${l.static ? '' : `<button class="la-btn" onclick="removeLayer('${l.id}')" title="Șterge">✕</button>`}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'e' : ''}`;
+  document.getElementById('featureCountBar').querySelector('span').textContent =
+    layers.reduce((s, l) => s + l.geojson.features.length, 0) + ' entități totale';
+}
+
+function toggleCat(id) {
+  CAT_STATE[id].open = !CAT_STATE[id].open;
+  renderTree();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COLOR POPUP
+// ═══════════════════════════════════════════════════════════════════
+const swatchesEl = document.getElementById('cpSwatches');
+SWATCHES.forEach(c => {
+  const s = document.createElement('div');
+  s.className = 'cp-swatch';
+  s.style.background = c;
+  s.onclick = () => applyColor(c);
+  swatchesEl.appendChild(s);
+});
+document.getElementById('cpCustom').oninput = e => applyColor(e.target.value);
+
+function openColorPopup(id, e) {
+  e.stopPropagation();
+  colorPopupTarget = id;
+  const popup = document.getElementById('colorPopup');
+  popup.classList.remove('hidden');
+  const rect = e.target.getBoundingClientRect();
+  popup.style.left = (rect.right + 8) + 'px';
+  popup.style.top  = Math.min(rect.top, window.innerHeight - 160) + 'px';
+}
+
+function applyColor(c) {
+  if (!colorPopupTarget) return;
+  const layer = layers.find(l => l.id === colorPopupTarget);
+  if (layer) { layer.color = c; updateLayerStyle(layer.id); renderTree(); }
+  document.getElementById('colorPopup').classList.add('hidden');
+  colorPopupTarget = null;
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('colorPopup').classList.add('hidden');
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// ATTRIBUTES
+// ═══════════════════════════════════════════════════════════════════
+function showAttr(feature, layer) {
+  const props = feature.properties || {};
+  const nationalC = getNationalC(props);
+  const scroll = document.getElementById('attrScroll');
+
+  document.getElementById('attrHdr').style.borderLeftColor = layer.color;
+
+  if (nationalC) {
+    // Mod cadastral: titlu = număr cadastral, afișăm doar suprafața
+    document.getElementById('attrLayerName').textContent = nationalC;
+    document.getElementById('attrGeomType').textContent = layer.name;
+
+    const areaRaw = Object.entries(props).find(([k]) => k.toUpperCase() === 'AREA_VALUE');
+    const areaVal = areaRaw ? Number(areaRaw[1]) : null;
+    const areaStr = areaVal != null && !isNaN(areaVal)
+      ? areaVal.toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' m²'
+      : '—';
+
+    scroll.innerHTML = `
+      <table class="attr-tbl"><tbody>
+        <tr><td>SUPRAFAȚĂ</td><td>${areaStr}</td></tr>
+      </tbody></table>`;
+  } else {
+    // Mod standard: toate atributele
+    document.getElementById('attrLayerName').textContent = layer.name;
+    document.getElementById('attrGeomType').textContent = feature.geometry?.type || '—';
+    const entries = Object.entries(props).filter(([,v]) => v !== null && v !== undefined && v !== '');
+    scroll.innerHTML = entries.length === 0
+      ? '<div class="attr-empty">Niciun atribut disponibil</div>'
+      : `<table class="attr-tbl"><tbody>${entries.map(([k,v]) =>
+          `<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  document.getElementById('attrPanel').classList.remove('hidden');
+}
+function closeAttr() { document.getElementById('attrPanel').classList.add('hidden'); }
+
+// ═══════════════════════════════════════════════════════════════════
+// SIDEBAR TOGGLE
+// ═══════════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  setTimeout(() => map.invalidateSize(), 210);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UPLOAD MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openUpload()  { document.getElementById('modal').classList.remove('hidden'); renderPresets(); }
+function closeUpload() {
+  document.getElementById('modal').classList.add('hidden');
+  selectedFile = null; selectedFiles = {};
+  document.getElementById('fileInput').value = '';
+  resetDropzone();
+  document.getElementById('layerNameInput').value = '';
+  document.getElementById('colorInput').value = '#2a7fff';
+  document.getElementById('colorHex').textContent = '#2a7fff';
+  document.getElementById('errMsg').style.display = 'none';
+  document.getElementById('progressBar').style.display = 'none';
+  document.getElementById('btnOk').disabled = true;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+}
+function handleOverlayClick(e) { if (e.target === e.currentTarget) closeUpload(); }
+function handleDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
+function handleDragLeave()  { document.getElementById('dropZone').classList.remove('drag-over'); }
+function handleDrop(e)      { e.preventDefault(); document.getElementById('dropZone').classList.remove('drag-over'); setFiles(Array.from(e.dataTransfer.files)); }
+function handleFileSelect(e){ setFiles(Array.from(e.target.files)); }
+
+function resetDropzone() {
+  document.getElementById('dropContent').innerHTML = `
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">Trage fișierul(ele) aici sau click</div>
+    <div class="drop-hint">.shp (+ .dbf/.prj opțional) &nbsp;·&nbsp; .zip (SHP arhivat) &nbsp;·&nbsp; .dxf</div>`;
+  document.getElementById('dropZone').classList.remove('has-file');
+}
+
+function setFiles(files) {
+  selectedFile = null; selectedFiles = {};
+  document.getElementById('errMsg').style.display = 'none';
+  files.forEach(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    if (ext === 'shp') selectedFiles.shp = f;
+    else if (ext === 'dbf') selectedFiles.dbf = f;
+    else if (ext === 'prj') selectedFiles.prj = f;
+    else if (ext === 'zip' || ext === 'dxf') selectedFile = f;
+  });
+
+  if (selectedFiles.shp) {
+    const parts = [selectedFiles.shp.name];
+    if (selectedFiles.dbf) parts.push(selectedFiles.dbf.name);
+    if (selectedFiles.prj) parts.push(selectedFiles.prj.name);
+    const warn = !selectedFiles.dbf ? '<div class="warn-dbf">⚠ Fără .dbf — atributele nu vor fi disponibile</div>' : '';
+    document.getElementById('dropContent').innerHTML = `
+      <div class="file-icon">📄</div>
+      <div class="file-info">${selectedFiles.shp.name}</div>
+      <div class="file-size">${parts.join(', ')}</div>${warn}`;
+    document.getElementById('dropZone').classList.add('has-file');
+    if (!document.getElementById('layerNameInput').value)
+      document.getElementById('layerNameInput').value = selectedFiles.shp.name.replace(/\.shp$/i,'');
+    document.getElementById('btnOk').disabled = false;
+  } else if (selectedFile) {
+    const ext = selectedFile.name.split('.').pop().toLowerCase();
+    if (!['zip','dxf'].includes(ext)) { showErr('Format nesupitat.'); return; }
+    document.getElementById('dropContent').innerHTML = `
+      <div class="file-icon">📄</div>
+      <div class="file-info">${selectedFile.name}</div>
+      <div class="file-size">${(selectedFile.size/1024).toFixed(1)} KB</div>`;
+    document.getElementById('dropZone').classList.add('has-file');
+    if (!document.getElementById('layerNameInput').value)
+      document.getElementById('layerNameInput').value = selectedFile.name.replace(/\.(zip|dxf)$/i,'');
+    document.getElementById('btnOk').disabled = false;
+  } else {
+    showErr('Format nesupitat. Folosiți .shp, .zip sau .dxf');
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errMsg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+async function submitUpload() {
+  if (!selectedFile && !selectedFiles.shp) return;
+  document.getElementById('btnOk').disabled = true;
+  document.getElementById('errMsg').style.display = 'none';
+  document.getElementById('progressBar').style.display = 'block';
+  setProgress(20);
+
+  const name  = document.getElementById('layerNameInput').value || 'Strat nou';
+  const color = document.getElementById('colorInput').value;
+  const cat   = document.getElementById('catSelect').value;
+  const crs   = document.getElementById('crsSelect').value;
+
+  try {
+    let geojson, format;
+    setProgress(40);
+    if (selectedFiles.shp) {
+      geojson = await parseShpFiles(selectedFiles.shp, selectedFiles.dbf, selectedFiles.prj, crs);
+      format = 'SHP';
+    } else {
+      const ext = selectedFile.name.split('.').pop().toLowerCase();
+      format = ext.toUpperCase();
+      geojson = ext === 'zip' ? await parseShpZip(selectedFile, crs) : await parseDxf(selectedFile);
+    }
+    setProgress(80);
+    if (!geojson?.features?.length) throw new Error('Nicio entitate găsită în fișier.');
+    addLayer({ id:'l_'+Date.now(), name, cat, color, format, geojson, visible:true });
+    setProgress(100);
+    setTimeout(closeUpload, 350);
+  } catch(err) {
+    showErr(err.message || 'Eroare la procesare fișier.');
+    document.getElementById('btnOk').disabled = false;
+    document.getElementById('progressBar').style.display = 'none';
+  }
+}
+
+function setProgress(p) { document.getElementById('progressFill').style.width = p + '%'; }
+
+function renderPresets() {
+  const cat = document.getElementById('catSelect').value;
+  const container = document.getElementById('presets');
+  const list = PRESETS.filter(p => p.cat === cat || cat === 'altele');
+  container.innerHTML = '';
+  list.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.type = 'button';
+    btn.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;vertical-align:middle"></span>${p.label}`;
+    btn.onclick = () => {
+      document.getElementById('colorInput').value = p.color;
+      document.getElementById('colorHex').textContent = p.color;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    container.appendChild(btn);
+  });
+}
+document.getElementById('catSelect').addEventListener('change', renderPresets);
+
+// ═══════════════════════════════════════════════════════════════════
+// PARSERS
+// ═══════════════════════════════════════════════════════════════════
+async function applyProjection(fc, crs, prjText) {
+  if (crs === 'wgs84') return fc;
+  if (crs === 'stereo70') return await reprojectAsync(fc, 'EPSG:31700');
+  if (crs === 'web')     return await reprojectAsync(fc, 'EPSG:3857');
+  // auto
+  if (needsReprojection(prjText))  return await reprojectAsync(fc, 'EPSG:31700');
+  if (isStereo70Coords(fc))        return await reprojectAsync(fc, 'EPSG:31700');
+  if (isWebMercatorCoords(fc))     return await reprojectAsync(fc, 'EPSG:3857');
+  return fc;
+}
+
+async function parseShpFiles(shpFile, dbfFile, prjFile, crs = 'auto') {
+  const shpBuf = await shpFile.arrayBuffer();
+  const dbfBuf = dbfFile ? await dbfFile.arrayBuffer() : null;
+  const prjText = prjFile ? await prjFile.text() : null;
+  const geoms = await shp.parseShp(shpBuf);
+  let features;
+  if (dbfBuf) {
+    const attrs = await shp.parseDbf(dbfBuf);
+    features = geoms.map((g,i) => ({ type:'Feature', geometry:g, properties:attrs[i]||{} }));
+  } else {
+    features = geoms.map(g => ({ type:'Feature', geometry:g, properties:{} }));
+  }
+  return applyProjection({ type:'FeatureCollection', features }, crs, prjText);
+}
+
+async function parseShpZip(file, crs = 'auto') {
+  const buf = await file.arrayBuffer();
+  const result = await shp(buf);
+  let fc = Array.isArray(result)
+    ? { type:'FeatureCollection', features: result.flatMap(r => r.features||[]) }
+    : result;
+  return applyProjection(fc, crs, null);
+}
+
+// Stereo70 (EPSG:31700) cu parametrii datum shift oficiali România
+const STEREO70_DEF =
+  '+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 ' +
+  '+ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs';
+proj4.defs('EPSG:31700', STEREO70_DEF);
+
+function sampleCoord(fc) {
+  const sample = fc.features[0]?.geometry?.coordinates;
+  if (!sample) return null;
+  const pt = Array.isArray(sample[0]) ? sample[0] : sample;
+  const x = Array.isArray(pt[0]) ? pt[0][0] : pt[0];
+  const y = Array.isArray(pt[0]) ? pt[0][1] : pt[1];
+  return { x, y };
+}
+
+function isStereo70Coords(fc) {
+  // Stereo70: X 300000–800000, Y 200000–700000 (metri, zona României)
+  const c = sampleCoord(fc);
+  return c && c.x > 100000 && c.x < 900000 && c.y > 100000 && c.y < 900000;
+}
+
+function isWebMercatorCoords(fc) {
+  // Web Mercator (EPSG:3857): valori de ordinul milioanelor
+  const c = sampleCoord(fc);
+  return c && (Math.abs(c.x) > 1000000 || Math.abs(c.y) > 1000000);
+}
+
+// Reproiecție asincronă cu chunking — nu blochează UI-ul pentru fișiere mari
+async function reprojectAsync(fc, fromEpsg) {
+  // Asigură definițiile proj4
+  if (!proj4.defs('EPSG:3857'))
+    proj4.defs('EPSG:3857','+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs');
+
+  const converter = proj4(fromEpsg, 'EPSG:4326');
+  function conv(c) { return converter.forward([c[0], c[1]]); }
+  function cvtG(g) {
+    if (!g) return g;
+    if (g.type==='Point') return {...g, coordinates:conv(g.coordinates)};
+    if (g.type==='LineString'||g.type==='MultiPoint') return {...g, coordinates:g.coordinates.map(conv)};
+    if (g.type==='Polygon'||g.type==='MultiLineString') return {...g, coordinates:g.coordinates.map(r=>r.map(conv))};
+    if (g.type==='MultiPolygon') return {...g, coordinates:g.coordinates.map(p=>p.map(r=>r.map(conv)))};
+    return g;
+  }
+
+  const CHUNK = 1500;
+  const input = fc.features;
+  const output = [];
+  const total = input.length;
+
+  for (let i = 0; i < total; i += CHUNK) {
+    const slice = input.slice(i, i + CHUNK);
+    for (const f of slice) output.push({...f, geometry: cvtG(f.geometry)});
+    // Actualizăm progress bar și cedăm controlul browser-ului
+    setProgress(40 + Math.round((i / total) * 38));
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  return {...fc, features: output};
+}
+
+function needsReprojection(prjText) {
+  if (!prjText) return false;
+  const t = prjText.toUpperCase();
+  return t.includes('STEREO') || t.includes('DEALUL_PISCULUI') ||
+         t.includes('31700') || t.includes('PULKOVO') || t.includes('KRASSOWSKI');
+}
+
+
+async function parseDxf(file) {
+  const text = await file.text();
+  const features = [];
+  const lines = text.split(/\r?\n/);
+
+  function readProps(startIdx) {
+    const p = {}; let i = startIdx;
+    while (i < lines.length) {
+      const code = lines[i]?.trim(), val = lines[i+1]?.trim();
+      if (code === '0') break;
+      if (code==='8') p.layer=val;
+      else if (code==='10') p.x1=parseFloat(val);
+      else if (code==='20') p.y1=parseFloat(val);
+      else if (code==='11') p.x2=parseFloat(val);
+      else if (code==='21') p.y2=parseFloat(val);
+      else if (code==='62') p.color=parseInt(val);
+      i+=2;
+    }
+    return p;
+  }
+
+  let inEntities = false;
+  for (let i = 0; i < lines.length; i++) {
+    const code = lines[i]?.trim(), val = lines[i+1]?.trim();
+    if (code==='2'&&val==='ENTITIES') { inEntities=true; i+=2; continue; }
+    if (!inEntities) continue;
+    if (code==='0'&&val==='ENDSEC') break;
+    if (code==='0') {
+      if (val==='LINE') {
+        const p=readProps(i+2);
+        if (p.x1!=null&&p.y1!=null&&p.x2!=null&&p.y2!=null)
+          features.push({type:'Feature',geometry:{type:'LineString',coordinates:[[p.x1,p.y1],[p.x2,p.y2]]},properties:{layer:p.layer||'0',type:'LINE'}});
+      } else if (val==='LWPOLYLINE'||val==='POLYLINE') {
+        const coords=[], props={}; let j=i+2, cx=null;
+        while(j<lines.length){const c=lines[j]?.trim(),v=lines[j+1]?.trim();if(c==='0')break;if(c==='8')props.layer=v;if(c==='10')cx=parseFloat(v);if(c==='20'&&cx!=null){coords.push([cx,parseFloat(v)]);cx=null;}j+=2;}
+        if (coords.length>=2) features.push({type:'Feature',geometry:{type:'LineString',coordinates:coords},properties:{layer:props.layer||'0',type:val}});
+      } else if (val==='POINT') {
+        const p=readProps(i+2);
+        if (p.x1!=null&&p.y1!=null) features.push({type:'Feature',geometry:{type:'Point',coordinates:[p.x1,p.y1]},properties:{layer:p.layer||'0',type:'POINT'}});
+      }
+    }
+  }
+  return { type:'FeatureCollection', features };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STRATURI STATICE CADASTRU — FlatGeobuf bbox streaming
+// ═══════════════════════════════════════════════════════════════════
+
+// Index de căutare: NATIONAL_C → {lon, lat, admin_unit}
+let cadSearchIndex = null;
+const FGB_LAYERS = {}; // id → { fgbUrl, leafletLayer, color, name, visible }
+const FGB_MIN_ZOOM = 13; // sub acest zoom nu încărcăm features (prea multe)
+
+function showStaticLoadMsg(msg) {
+  let el = document.getElementById('staticLoadMsg');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'staticLoadMsg';
+    el.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);'+
+      'background:var(--panel);border:1px solid var(--accent);color:var(--text);'+
+      'padding:8px 18px;border-radius:8px;font-size:13px;z-index:9999;pointer-events:none;'+
+      'box-shadow:0 4px 16px rgba(0,0,0,.5)';
+    document.body.appendChild(el);
+  }
+  if (msg) { el.textContent = msg; el.style.display = 'block'; }
+  else { el.style.display = 'none'; }
+}
+
+// Încarcă CSV index pentru căutare cadastrală (8MB, o singură dată)
+async function loadCadSearchIndex() {
+  try {
+    showStaticLoadMsg('Se încarcă indexul cadastral...');
+    const resp = await fetch('DATA/PARCELE_INDEX.csv');
+    const text = await resp.text();
+    const idx = {};
+    const lines = text.split('\n');
+    for (let i = 1; i < lines.length; i++) {
+      const [nc, au, lon, lat] = lines[i].split(',');
+      if (nc && lon && lat) idx[nc.trim()] = { lon: +lon, lat: +lat, admin_unit: +(au||0) };
+    }
+    cadSearchIndex = idx;
+    showStaticLoadMsg('');
+  } catch(e) {
+    console.error('Eroare index cadastral', e);
+    showStaticLoadMsg('');
+  }
+}
+
+// Creează un layer FGB streaming (fără date inițiale)
+function createFgbLayer(id, name, color, fgbUrl) {
+  const style = () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
+  const onEach = (f, lyr) => {
+    lyr.on('click', e => { L.DomEvent.stopPropagation(e); if (activeTool === 'pan') showAttr(f, FGB_LAYERS[id]); });
+    lyr.on('mouseover', function() { this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 }); });
+    lyr.on('mouseout',  function() { this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 }); });
+  };
+
+  const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach }); // nu adăugat pe hartă implicit
+
+  // Obiect pseudo-layer pentru compatibilitate cu renderTree / showAttr
+  const layerObj = {
+    id, name, cat:'cadastru', color, format:'SHP',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isFgb: true,
+    _withLabels: (id === 'static_parcele'),
+    leafletLayer: geoLayer,
+    fgbUrl
+  };
+  FGB_LAYERS[id] = layerObj;
+  layers.push(layerObj);
+  renderTree();
+  return layerObj;
+}
+
+// Încarcă features FGB pentru bbox curent
+let fgbLoadTimer = null;
+async function refreshFgbLayers() {
+  if (map.getZoom() < FGB_MIN_ZOOM) {
+    // Sub zoom minim — golim toate layerele FGB
+    for (const id in FGB_LAYERS) {
+      const l = FGB_LAYERS[id];
+      if (l.visible) { l.leafletLayer.clearLayers(); l.geojson.features = []; }
+    }
+    scheduleLabels();
+    return;
+  }
+  const b = map.getBounds();
+  const rect = { minX: b.getWest(), minY: b.getSouth(), maxX: b.getEast(), maxY: b.getNorth() };
+
+  for (const id in FGB_LAYERS) {
+    const l = FGB_LAYERS[id];
+    if (!l.visible) continue;
+    try {
+      const resp = await fetch(l.fgbUrl);
+      const features = [];
+      for await (const f of flatgeobuf.deserialize(resp.body, rect)) {
+        features.push(f);
+      }
+      l.geojson.features = features;
+      l.leafletLayer.clearLayers();
+      l.leafletLayer.addData({ type:'FeatureCollection', features });
+    } catch(e) { console.error('FGB load error', id, e); }
+  }
+  scheduleLabels();
+}
+
+function scheduleFgbRefresh() {
+  clearTimeout(fgbLoadTimer);
+  fgbLoadTimer = setTimeout(refreshFgbLayers, 400);
+}
+
+async function loadStaticLayers() {
+  createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb');
+  createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
+  map.on('moveend zoomend', scheduleFgbRefresh);
+  loadCadSearchIndex();   // paralel, nu blocheaza
+  scheduleFgbRefresh();   // incarca features pentru viewport curent
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+renderTree();
+renderPresets();
+loadStaticLayers();
+
+// ── Layer custom pentru ArcGIS Dynamic MapServer ─────────────────────
+const ArcGISDynamic = L.Layer.extend({
+  initialize(url, options) {
+    this._url = url;
+    L.setOptions(this, options);
+  },
+  onAdd(map) {
+    this._map = map;
+    this._img = L.DomUtil.create('img', 'arcgis-dynamic-layer');
+    Object.assign(this._img.style, {
+      position:'absolute', top:0, left:0,
+      pointerEvents:'none', opacity: this.options.opacity ?? 1
+    });
+    map.getPanes().overlayPane.appendChild(this._img);
+    map.on('moveend zoomend resize', this._update, this);
+    this._update();
+  },
+  onRemove(map) {
+    map.getPanes().overlayPane.removeChild(this._img);
+    map.off('moveend zoomend resize', this._update, this);
+  },
+  setOpacity(v) { this._img.style.opacity = v; return this; },
+  _update() {
+    const map = this._map;
+    const size = map.getSize();
+    const b = map.getBounds();
+    const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+    const url = `${this._url}/export?bbox=${bbox}&bboxSR=4326&layers=show`+
+      `&size=${size.x},${size.y}&imageSR=4326&format=png32&transparent=true&f=image`;
+
+    const nw = map.latLngToLayerPoint(b.getNorthWest());
+    const se = map.latLngToLayerPoint(b.getSouthEast());
+    Object.assign(this._img.style, {
+      width:  (se.x - nw.x) + 'px',
+      height: (se.y - nw.y) + 'px',
+    });
+    L.DomUtil.setPosition(this._img, nw);
+
+    const img = this._img;
+    const newSrc = url;
+    img.onload = () => { img.style.opacity = this.options.opacity ?? 1; };
+    img.style.opacity = 0;
+    img.src = newSrc;
+  }
+});
+
+// ── Limite UAT Gorj ──────────────────────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/UAT_GORJ.geojson');
+    if (!resp.ok) return;
+    const fc = await resp.json();
+    addLayer({
+      id: 'static_uat_gorj',
+      name: 'Limite UAT Gorj',
+      cat: 'cadastru',
+      color: '#e74c3c',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true,
+      _withLabels: true,
+      _labelField: 'name',
+      _labelMinZoom: 9
+    });
+  } catch(e) { console.error('Eroare UAT Gorj', e); }
+})();
+
+// ── Strat static Transgaz ────────────────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/Transgaz_SHP.zip');
+    if (!resp.ok) return;
+    const buf = await resp.arrayBuffer();
+    const results = await shp(buf);
+    const arr = Array.isArray(results) ? results : [results];
+    const allFeatures = arr.flatMap(fc => fc.features || []);
+    addLayer({
+      id: 'static_transgaz',
+      name: 'TRANSGAZ',
+      cat: 'transport',
+      color: '#e67e22',
+      format: 'SHP',
+      geojson: { type:'FeatureCollection', features: allFeatures },
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Transgaz', e); }
+})();
+
+// ── Strat static Limite Intravilan ──────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/LIMITA_INTRAVILAN.geojson');
+    if (!resp.ok) return;
+    const fc = await resp.json();
+    addLayer({
+      id: 'static_intravilan',
+      name: 'Limite Intravilan',
+      cat: 'urbanism',
+      color: '#9b59b6',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Intravilan', e); }
+})();
+
+// ── Strat static Sit Natura 2000 ────────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/SIT_NATURA2000.geojson');
+    if (!resp.ok) return;
+    const fc = await resp.json();
+    addLayer({
+      id: 'static_natura2000',
+      name: 'Sit Natura 2000',
+      cat: 'mediu',
+      color: '#27ae60',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true,
+      _withLabels: true,
+      _labelField: 'SitName',
+      _labelMinZoom: 11
+    });
+  } catch(e) { console.error('Eroare Natura 2000', e); }
+})();
+
+// ── Strat static DEO (Distribuție Oltenia) ──────────────────────────
+(function() {
+  const deoTile = new ArcGISDynamic(
+    'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
+    { opacity: 1, attribution: '© Distribuție Oltenia' }
+  );
+  const deoLayer = {
+    id: 'static_deo',
+    name: 'Rețea DEO',
+    cat: 'utilitati',
+    color: '#2ecc71',
+    format: 'WMS',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isTile: true,
+    leafletLayer: deoTile,
+  };
+  layers.push(deoLayer);
+  renderTree();
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// CADASTRAL SEARCH
+// ═══════════════════════════════════════════════════════════════════
+
+// Tabel SIRUTA complet pentru județul Gorj (sursă: machetecodsirutasiuatpejudete.xls)
+// cod_siruta → denumire_uat
+const SIRUTA_GORJ = {
+  77812:'TÂRGU JIU', 78141:'MOTRU',
+  78258:'NOVACI', 78329:'TÂRGU CĂRBUNEȘTI', 78454:'TICLENI',
+  82895:'ROVINARI', 79308:'BUMBEȘTI-JIU', 82430:'TISMANA', 82617:'TURCENI',
+  78472:'ALBENI', 78542:'ALIMPEȘTI', 78604:'ANINOASA', 78668:'ARCANI',
+  78711:'BAIA DE FIER', 78748:'BĂLĂNEȘTI', 78828:'BĂRBĂTEȘTI',
+  78873:'BENGEȘTI CIOCADIA', 78926:'BERLEȘTI', 79004:'BÂLTENI',
+  79077:'BOLBOȘI', 79157:'BORĂSCU', 79237:'BRĂNEȘTI', 78016:'DRĂGUTEȘTI',
+  79362:'BUMBEȘTI PITIC', 79406:'BUSTUCHIN', 79497:'CĂPRENI',
+  79585:'CĂTUNELE', 79656:'CIUPERCENI', 79736:'CÂLNIC', 79834:'CRASNA',
+  79932:'CRUȘEȚ', 80043:'DÂNCIULEȘTI', 80123:'DĂNEȘTI', 80249:'DRĂGOTEȘTI',
+  80285:'FARCĂȘEȘTI', 80365:'GLOGOVA', 80427:'GODINEȘTI', 80506:'HUREZANI',
+  80560:'IONEȘTI', 80613:'JUPÂNEȘTI', 80677:'LELEȘTI', 80711:'LICURICI',
+  80766:'LOGREȘTI', 80846:'MĂTĂSARI', 80908:'MUȘETEȘTI', 80980:'NEGOMIR',
+  81095:'PADEȘ', 81184:'PEȘTIȘANI', 81380:'POLOVRAGI', 81264:'PLOPȘORU',
+  81415:'PRIGORIA', 81497:'ROȘIA DE AMARADIA', 81576:'RUNCU',
+  81656:'SĂMARINEȘTI', 81754:'SĂCELU', 81816:'SĂULEȘTI', 81861:'SCOARȚA',
+  81987:'SCHELA', 82047:'SLIVILEŞTI', 82136:'STĂNEȘTI', 82243:'STEJARI',
+  82314:'STOINA', 82396:'TELEŞTI', 82555:'TURBUREA', 82680:'TÂNTĂRENI',
+  82733:'URDARI', 82779:'VĂGIULEȘTI',
+};
+
+// Normalizează text: minuscule, fără diacritice, fără cratime/spații multiple
+function normText(s) {
+  return String(s ?? '').toLowerCase()
+    .replace(/[ăâ]/g,'a').replace(/î/g,'i').replace(/[șş]/g,'s')
+    .replace(/[țţ]/g,'t').replace(/[-–]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// Construiește index invers: text_normalizat → [cod_siruta, ...]
+const SIRUTA_IDX = {};
+for (const [cod, den] of Object.entries(SIRUTA_GORJ)) {
+  const key = normText(den);
+  if (!SIRUTA_IDX[key]) SIRUTA_IDX[key] = [];
+  SIRUTA_IDX[key].push(Number(cod));
+}
+
+// Caută coduri SIRUTA care se potrivesc cu textul introdus de utilizator
+function findSirutaCodes(input) {
+  if (!input) return null; // null = fără filtru UAT
+  const q = normText(input);
+  const matches = new Set();
+  for (const [key, codes] of Object.entries(SIRUTA_IDX)) {
+    if (key.includes(q)) codes.forEach(c => matches.add(String(c)));
+  }
+  // Fallback: numeric direct
+  if (!isNaN(input)) matches.add(String(Number(input)));
+  return matches.size ? matches : new Set(); // set gol = nicio potrivire
+}
+
+// Autocompletare UAT în câmpul de input
+function buildUatSuggestions() {
+  const datalist = document.createElement('datalist');
+  datalist.id = 'uatList';
+  for (const den of Object.values(SIRUTA_GORJ)) {
+    const opt = document.createElement('option');
+    opt.value = den;
+    datalist.appendChild(opt);
+  }
+  document.body.appendChild(datalist);
+  document.getElementById('cadUat').setAttribute('list','uatList');
+}
+buildUatSuggestions();
+
+// Câmp număr cadastral — câmpul ADMIN_UNIT este cod SIRUTA în SHP-urile cadastrale
+const CAD_NR_FIELD = 'nr_cad'; // detectat dinamic la search
+
+let cadHighlightLayer = null;
+let cadSearchTimer = null;
+
+function openCadSearch() {
+  document.getElementById('cadModal').classList.remove('hidden');
+  document.getElementById('cadNr').focus();
+  cadLiveSearch();
+}
+function closeCadSearch() {
+  document.getElementById('cadModal').classList.add('hidden');
+  clearCadHighlight();
+}
+function handleCadOverlay(e) { if (e.target === e.currentTarget) closeCadSearch(); }
+
+function clearCadHighlight() {
+  if (cadHighlightLayer) { map.removeLayer(cadHighlightLayer); cadHighlightLayer = null; }
+}
+
+function getAdminUnit(props) {
+  for (const key of Object.keys(props)) {
+    if (key.toLowerCase() === 'admin_unit') return String(props[key] ?? '');
+  }
+  return null;
+}
+
+function getCadNr(props) {
+  // Prioritate: NATIONAL_C (câmpul standard din SHP-urile cadastrale Gorj)
+  // Fallback: câmpuri alternative
+  const candidates = ['national_c','nr_cad','nrcad','numar_cad','nr_cadastral','cad_nr',
+                      'nr_top','nrtop','id_cad','cadnum','nr_imobil','parcela','nr_parcela','numar'];
+  for (const key of Object.keys(props)) {
+    if (candidates.includes(key.toLowerCase())) return String(props[key] ?? '').trim();
+  }
+  return null;
+}
+
+function cadLiveSearch() {
+  clearTimeout(cadSearchTimer);
+  cadSearchTimer = setTimeout(runCadSearch, 200);
+}
+
+function runCadSearch() {
+  const nrRaw  = document.getElementById('cadNr').value.trim();
+  const uatRaw = document.getElementById('cadUat').value.trim();
+  const resultsEl = document.getElementById('cadResults');
+  const hintEl    = document.getElementById('cadHint');
+
+  if (!nrRaw && !uatRaw) {
+    resultsEl.innerHTML = '';
+    hintEl.style.display = 'block';
+    return;
+  }
+  hintEl.style.display = 'none';
+
+  const sirutaCodes = uatRaw ? findSirutaCodes(uatRaw) : null;
+  if (sirutaCodes && sirutaCodes.size === 0) {
+    resultsEl.innerHTML = `<div class="no-results">UAT-ul <strong>"${uatRaw}"</strong> nu a fost găsit în județul Gorj.</div>`;
+    return;
+  }
+
+  // Caută în indexul CSV (disponibil imediat după încărcare)
+  if (cadSearchIndex) {
+    const nrNorm = nrRaw.replace(/^0+/,'').toLowerCase();
+    const results = [];
+
+    for (const [nc, entry] of Object.entries(cadSearchIndex)) {
+      const ncNorm = nc.replace(/^0+/,'').toLowerCase();
+      const nrOk = !nrRaw || ncNorm === nrNorm || ncNorm.includes(nrNorm);
+      const uatOk = !sirutaCodes || sirutaCodes.has(String(Math.round(entry.admin_unit)));
+      if (nrOk && uatOk) {
+        results.push({ nc, entry });
+        if (results.length >= 50) break;
+      }
+    }
+
+    if (results.length === 0) {
+      resultsEl.innerHTML = `<div class="no-results">Niciun rezultat pentru nr. <strong>${nrRaw}</strong>${uatRaw ? ` în <strong>${uatRaw}</strong>` : ''}.</div>`;
+      return;
+    }
+
+    window._cadResults = results.map(r => ({ nc: r.nc, entry: r.entry, feature: null, layer: FGB_LAYERS['static_parcele'] }));
+
+    resultsEl.innerHTML = results.map((r, i) => {
+      const uatName = SIRUTA_GORJ[Math.round(r.entry.admin_unit)] || `SIRUTA: ${r.entry.admin_unit}`;
+      return `<div class="result-item" id="ri_${i}" onclick="zoomToResult(${i})">
+        <div class="ri-top">
+          <span class="ri-badge">#${i+1}</span>
+          <span class="ri-name">Nr. ${r.nc}</span>
+          <span class="ri-layer">Parcele</span>
+        </div>
+        <div class="ri-layer" style="margin-bottom:3px">📍 ${uatName}</div>
+      </div>`;
+    }).join('') + (results.length === 50
+      ? '<div class="search-hint" style="padding:8px 0">Primele 50 rezultate — refinează căutarea.</div>' : '');
+    return;
+  }
+
+  // Fallback: caută în features deja încărcate (pentru layere non-FGB)
+  const results = [];
+  const nrNorm = nrRaw.replace(/^0+/,'').toLowerCase();
+  for (const layer of layers) {
+    if (layer._isFgb) continue;
+    for (const feature of layer.geojson.features) {
+      const props = feature.properties || {};
+      let uatOk = !sirutaCodes;
+      if (sirutaCodes) {
+        const au = getAdminUnit(props);
+        uatOk = au !== null ? sirutaCodes.has(au) : false;
+      }
+      let nrOk = !nrRaw;
+      if (nrRaw) {
+        const cadNr = getCadNr(props);
+        if (cadNr) nrOk = cadNr.replace(/^0+/,'').toLowerCase().includes(nrNorm);
+      }
+      if (uatOk && nrOk) { results.push({ feature, layer }); if (results.length >= 50) break; }
+    }
+    if (results.length >= 50) break;
+  }
+
+  if (results.length === 0) {
+    resultsEl.innerHTML = `<div class="no-results">Niciun rezultat${nrRaw ? ` pentru <strong>${nrRaw}</strong>` : ''}.</div>`;
+    return;
+  }
+  window._cadResults = results;
+  resultsEl.innerHTML = results.map((r, i) => {
+    const props = r.feature.properties || {};
+    const cadNr = getCadNr(props) || '—';
+    const au = getAdminUnit(props);
+    const uatName = au ? (SIRUTA_GORJ[Number(au)] || au) : '—';
+    return `<div class="result-item" id="ri_${i}" onclick="zoomToResult(${i})">
+      <div class="ri-top"><span class="ri-badge">#${i+1}</span><span class="ri-name">Nr. ${cadNr}</span><span class="ri-layer">${r.layer.name}</span></div>
+      <div class="ri-layer" style="margin-bottom:3px">📍 ${uatName}</div>
+    </div>`;
+  }).join('');
+}
+
+let cadPinMarker = null;
+
+function clearCadHighlight() {
+  if (cadHighlightLayer) { map.removeLayer(cadHighlightLayer); cadHighlightLayer = null; }
+  if (cadPinMarker)      { map.removeLayer(cadPinMarker);      cadPinMarker = null; }
+}
+
+async function zoomToResult(idx) {
+  const r = window._cadResults?.[idx];
+  if (!r) return;
+  clearCadHighlight();
+
+  // Evidențiere în lista de rezultate
+  document.querySelectorAll('.result-item').forEach(el => el.classList.remove('highlighted'));
+  const riEl = document.getElementById('ri_' + idx);
+  if (riEl) { riEl.classList.add('highlighted'); riEl.scrollIntoView({ block:'nearest' }); }
+
+  // Rezultat din indexul CSV (FGB) — avem doar centroid lon/lat
+  if (r.entry && !r.feature) {
+    const center = L.latLng(r.entry.lat, r.entry.lon);
+    const uatName = SIRUTA_GORJ[Math.round(r.entry.admin_unit)] || '';
+
+    // Zoom la zoom 18 pe centroid
+    map.setView(center, 18);
+
+    // Așteptăm încărcarea FGB bbox (400ms debounce + timp fetch)
+    await new Promise(res => setTimeout(res, 900));
+
+    // Caută feature-ul în layerul FGB după ce s-a încărcat bbox-ul
+    const parcelLayer = FGB_LAYERS['static_parcele'];
+    const loaded = parcelLayer?.geojson?.features || [];
+    const found = loaded.find(f => String(f.properties?.NATIONAL_C || '').trim() === r.nc);
+
+    if (found) {
+      const hl = L.geoJSON({ type:'Feature', geometry:found.geometry, properties:{} }, {
+        style: () => ({ color:'#ffeb3b', weight:5, opacity:1, fillColor:'#ffeb3b', fillOpacity:.25, className:'search-hl-path' }),
+      }).addTo(map);
+      cadHighlightLayer = hl;
+      const bounds = hl.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding:[80,80], maxZoom:19 });
+      showAttr(found, parcelLayer);
+    }
+
+    // Marker + popup indiferent dacă s-a găsit geometria
+    const pinIcon = L.divIcon({ className:'', html:'<div class="search-marker-pin"></div>', iconSize:[24,24], iconAnchor:[12,12] });
+    cadPinMarker = L.marker(center, { icon:pinIcon, interactive:false }).addTo(map);
+    L.popup({ closeButton:false, offset:[0,-14], autoPan:false })
+      .setLatLng(center)
+      .setContent(`<b style="font-size:13px">📍 ${r.nc}</b><br><small style="color:#888">${uatName}</small>`)
+      .openOn(map);
+    return;
+  }
+
+  // Rezultat clasic cu geometrie completă
+  try {
+    const hl = L.geoJSON({ type:'Feature', geometry:r.feature.geometry, properties:{} }, {
+      style: () => ({ color:'#ffeb3b', weight:5, opacity:1, fillColor:'#ffeb3b', fillOpacity:.2, className:'search-hl-path' }),
+      pointToLayer: (f, ll) => L.circleMarker(ll, { radius:16, color:'#ffeb3b', weight:4, fillColor:'#ffeb3b', fillOpacity:.3, className:'search-hl-path' }),
+    }).addTo(map);
+    cadHighlightLayer = hl;
+    let center;
+    try { center = hl.getBounds().getCenter(); } catch(e) {}
+    if (center) {
+      const pinIcon = L.divIcon({ className:'', html:'<div class="search-marker-pin"></div>', iconSize:[24,24], iconAnchor:[12,12] });
+      cadPinMarker = L.marker(center, { icon:pinIcon, interactive:false }).addTo(map);
+      const nr = getNationalC(r.feature.properties || '') || '—';
+      const uatCode = (r.feature.properties || {})['ADMIN_UNIT'] || '';
+      const uatName = SIRUTA_GORJ[Number(uatCode)] || uatCode;
+      L.popup({ closeButton:false, offset:[0,-14], autoPan:false })
+        .setLatLng(center)
+        .setContent(`<b style="font-size:13px">📍 ${nr}</b><br><small style="color:#888">${uatName}</small>`)
+        .openOn(map);
+    }
+    const bounds = hl.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding:[100,100], maxZoom:19 });
+    showAttr(r.feature, r.layer);
+  } catch(e) { console.error('Zoom error:', e); }
+}
+</script>
+</body>
+</html>
