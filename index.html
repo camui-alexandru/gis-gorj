@@ -1547,6 +1547,28 @@ const ArcGISDynamic = L.Layer.extend({
   renderTree();
 })();
 
+// ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
+(function() {
+  const pugTile = new ArcGISDynamic(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    { opacity: 0.85, attribution: '© CJ Gorj' }
+  );
+  const pugLayer = {
+    id: 'static_pug',
+    name: 'PUG (Plan Urbanistic General)',
+    cat: 'urbanism',
+    color: '#8e44ad',
+    format: 'WMS',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isTile: true,
+    leafletLayer: pugTile,
+  };
+  layers.push(pugLayer);
+  renderTree();
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 // CADASTRAL SEARCH
 // ═══════════════════════════════════════════════════════════════════
