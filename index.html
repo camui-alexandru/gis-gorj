@@ -206,6 +206,85 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
+/* ── MOBILE ────────────────────────────────────────────────────── */
+@media(max-width:767px){
+  /* Topbar compact */
+  .topbar{height:52px;flex-wrap:nowrap;overflow:hidden}
+  .tb-brand{min-width:unset;padding:0 10px;border-right:none}
+  .tb-brand h1 small{display:none}
+  .tb-brand h1{font-size:13px}
+  .tb-tools{display:none}
+  .tb-right{padding:0 8px;gap:6px}
+  .coord-display{display:none}
+  .basemap-select{font-size:11px;padding:4px 6px;max-width:120px}
+  .btn-add{padding:6px 10px;font-size:11px}
+  .tool-btn{padding:6px 8px;font-size:12px}
+
+  /* Sidebar ca drawer overlay */
+  .sidebar{
+    position:fixed;top:52px;left:-280px;width:280px!important;min-width:280px!important;
+    height:calc(100vh - 52px);z-index:2000;
+    transition:left .25s ease;
+    box-shadow:4px 0 20px rgba(0,0,0,.6);
+  }
+  .sidebar.open{left:0}
+  .sidebar.collapsed{left:-280px;width:280px!important}
+
+  /* Backdrop când sidebar e deschis */
+  #mob-backdrop{
+    display:none;position:fixed;inset:0;top:52px;
+    background:rgba(0,0,0,.55);z-index:1999;
+  }
+  #mob-backdrop.show{display:block}
+
+  /* Map full screen */
+  .main{flex-direction:column}
+  #map{width:100%;flex:1}
+
+  /* Buton float straturi */
+  #mob-layers-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:80px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    border:none;font-size:20px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
+  /* Buton float căutare cadastrală */
+  #mob-search-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:140px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--panel);color:var(--text);
+    border:1px solid var(--border);font-size:20px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
+  /* Status bar simplificat */
+  .statusbar{font-size:10px;gap:8px;padding:0 8px;height:28px}
+  .sb-item:nth-child(3),.sb-item:nth-child(4){display:none}
+
+  /* Attr panel full width pe mobil */
+  .attr-panel{right:0;left:0;bottom:28px;width:auto;border-radius:8px 8px 0 0}
+
+  /* Layer rows mai mari (touch) */
+  .layer-row{padding:9px 10px 9px 24px}
+  .layer-vis{width:20px;font-size:14px}
+  .layer-label{font-size:13px}
+  .layer-actions{opacity:1}
+  .la-btn{padding:4px 6px;font-size:13px}
+
+  /* Cat headers mai mari */
+  .cat-header{padding:10px 12px}
+  .cat-name{font-size:13px}
+
+  /* Modal full screen pe mobil */
+  .modal{width:100%!important;max-width:100%!important;max-height:92vh;border-radius:12px 12px 0 0;position:fixed;bottom:0;left:0;right:0;margin:0}
+  .overlay{align-items:flex-end}
+  .search-modal{width:100%!important}
+}
+
 /* ── LEAFLET OVERRIDES ─────────────────────────────────────────── */
 .leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important}
 .leaflet-control-zoom a:hover{background:var(--panel2)!important}
@@ -272,6 +351,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 
   <!-- MAP -->
   <div id="map"></div>
+
+  <!-- MOBILE BUTTONS -->
+  <div id="mob-backdrop" onclick="closeMobileSidebar()"></div>
+  <button id="mob-layers-btn" onclick="toggleMobileSidebar()" style="display:none">☰</button>
+  <button id="mob-search-btn" onclick="openCadSearch()" style="display:none">🔎</button>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
@@ -873,9 +957,32 @@ function closeAttr() { document.getElementById('attrPanel').classList.add('hidde
 // SIDEBAR TOGGLE
 // ═══════════════════════════════════════════════════════════════════
 function toggleSidebar() {
+  if (window.innerWidth <= 767) { toggleMobileSidebar(); return; }
   document.getElementById('sidebar').classList.toggle('collapsed');
   setTimeout(() => map.invalidateSize(), 210);
 }
+function toggleMobileSidebar() {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('mob-backdrop');
+  sb.classList.toggle('open');
+  bd.classList.toggle('show');
+}
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mob-backdrop').classList.remove('show');
+}
+
+// Inițializare butoane mobile
+(function initMobile() {
+  function checkMobile() {
+    const isMob = window.innerWidth <= 767;
+    document.getElementById('mob-layers-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-search-btn').style.display = isMob ? 'flex' : 'none';
+    if (!isMob) closeMobileSidebar();
+  }
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 // UPLOAD MODAL
