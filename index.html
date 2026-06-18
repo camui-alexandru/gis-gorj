@@ -1551,10 +1551,15 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
 (function() {
-  const pugTile = L.tileLayer(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/tile/{z}/{y}/{x}',
-    { opacity: 0.85, attribution: '© CJ Gorj', maxNativeZoom: 19, maxZoom: 22 }
+  const pugWms = L.tileLayer.wms(
+    'https://gis.cjgorj.ro/server/services/FIDA/PUG/MapServer/WMSServer',
+    { layers: '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20',
+      format: 'image/png', transparent: true, version: '1.1.1',
+      opacity: 0.85, attribution: '© CJ Gorj', maxZoom: 22 }
   );
+  pugWms.on('tileerror', function(e) {
+    console.warn('PUG WMS tile error:', e.tile?.src);
+  });
   const pugLayer = {
     id: 'static_pug',
     name: 'PUG (Plan Urbanistic General)',
@@ -1565,7 +1570,7 @@ const ArcGISDynamic = L.Layer.extend({
     visible: false,
     static: true,
     _isTile: true,
-    leafletLayer: pugTile,
+    leafletLayer: pugWms,
   };
   layers.push(pugLayer);
   renderTree();
