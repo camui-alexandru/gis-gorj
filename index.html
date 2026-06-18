@@ -1421,7 +1421,8 @@ const ArcGISDynamic = L.Layer.extend({
     const size = map.getSize();
     const b = map.getBounds();
     const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
-    const url = `${this._url}/export?bbox=${bbox}&bboxSR=4326&layers=show`+
+    const layersParam = this.options.layers != null ? `&layers=show:${this.options.layers}` : '';
+    const url = `${this._url}/export?bbox=${bbox}&bboxSR=4326${layersParam}`+
       `&size=${size.x},${size.y}&imageSR=4326&format=png32&transparent=true&f=image`;
 
     const nw = map.latLngToLayerPoint(b.getNorthWest());
