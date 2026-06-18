@@ -868,7 +868,7 @@ function renderTree() {
     </div>`;
   }).join('');
 
-  document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'e' : ''}`;
+  document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'uri' : ''}`;
   document.getElementById('featureCountBar').querySelector('span').textContent =
     layers.reduce((s, l) => s + l.geojson.features.length, 0) + ' entități totale';
 }
