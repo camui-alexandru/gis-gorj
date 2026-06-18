@@ -1551,10 +1551,10 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
 (function() {
-  const pugTile = L.esri.dynamicMapLayer({
-    url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    opacity: 0.85, attribution: '© CJ Gorj', f: 'image'
-  });
+  const pugTile = L.tileLayer(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/tile/{z}/{y}/{x}',
+    { opacity: 0.85, attribution: '© CJ Gorj', maxNativeZoom: 19, maxZoom: 22 }
+  );
   const pugLayer = {
     id: 'static_pug',
     name: 'PUG (Plan Urbanistic General)',
