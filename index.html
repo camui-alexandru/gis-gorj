@@ -487,6 +487,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
 <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
 <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // STATE
@@ -1528,10 +1529,10 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat static DEO (Distribuție Oltenia) ──────────────────────────
 (function() {
-  const deoTile = new ArcGISDynamic(
-    'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
-    { opacity: 1, attribution: '© Distribuție Oltenia' }
-  );
+  const deoTile = L.esri.dynamicMapLayer({
+    url: 'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
+    opacity: 1, attribution: '© Distribuție Oltenia', f: 'image'
+  });
   const deoLayer = {
     id: 'static_deo',
     name: 'Rețea DEO',
@@ -1550,10 +1551,10 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
 (function() {
-  const pugTile = new ArcGISDynamic(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    { opacity: 0.85, attribution: '© CJ Gorj' }
-  );
+  const pugTile = L.esri.dynamicMapLayer({
+    url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    opacity: 0.85, attribution: '© CJ Gorj', f: 'image'
+  });
   const pugLayer = {
     id: 'static_pug',
     name: 'PUG (Plan Urbanistic General)',
