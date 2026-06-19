@@ -1572,6 +1572,67 @@ async function loadStereo70Zip(url) {
   } catch(e) { console.error('Eroare Romgaz', e); }
 })();
 
+// ── Strat static Orange Aerian ──────────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/OrangeAerian.zip');
+    if (!resp.ok) return;
+    const buf = await resp.arrayBuffer();
+    const results = await shp(buf);
+    const arr = Array.isArray(results) ? results : [results];
+    const allFeatures = arr.flatMap(fc => fc.features || []);
+    addLayer({
+      id: 'static_orange_aerian',
+      name: 'Orange Aerian',
+      cat: 'utilitati',
+      color: '#ff6d00',
+      format: 'SHP',
+      geojson: { type:'FeatureCollection', features: allFeatures },
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Orange Aerian', e); }
+})();
+
+// ── Strat static Orange Subteran ────────────────────────────────────
+(async function() {
+  try {
+    const resp = await fetch('DATA/OrangeSubteran.zip');
+    if (!resp.ok) return;
+    const buf = await resp.arrayBuffer();
+    const results = await shp(buf);
+    const arr = Array.isArray(results) ? results : [results];
+    const allFeatures = arr.flatMap(fc => fc.features || []);
+    addLayer({
+      id: 'static_orange_subteran',
+      name: 'Orange Subteran',
+      cat: 'utilitati',
+      color: '#e65100',
+      format: 'SHP',
+      geojson: { type:'FeatureCollection', features: allFeatures },
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Orange Subteran', e); }
+})();
+
+// ── Strat static ANCOM ──────────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/ANCOM.zip');
+    addLayer({
+      id: 'static_ancom',
+      name: 'ANCOM',
+      cat: 'utilitati',
+      color: '#00bfa5',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare ANCOM', e); }
+})();
+
 // ── Strat static Limite Intravilan ──────────────────────────────────
 (async function() {
   try {
