@@ -1572,32 +1572,56 @@ const ArcGISDynamic = L.Layer.extend({
   layers.push(pugLayer);
   renderTree();
 
+  // Geometria selectată pe hartă
+  let pugHighlight = null;
+  function clearPugHighlight() {
+    if (pugHighlight) { map.removeLayer(pugHighlight); pugHighlight = null; }
+  }
+
+  // Convertește geometrie ArcGIS (rings/paths) în coordonate Leaflet [lat,lng]
+  function arcgisToLatLngs(geometry) {
+    const rings = geometry.rings || geometry.paths;
+    if (!rings) return null;
+    return rings.map(ring => ring.map(pt => [pt[1], pt[0]]));
+  }
+
   // Identify on click — trimite request la MapServer prin proxy
   map.on('click', async function(e) {
     if (!pugLayer.visible || activeTool !== 'pan') return;
+    clearPugHighlight();
     const b = map.getBounds();
     const s = map.getSize();
     const identifyUrl = 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/identify' +
       '?geometry=' + e.latlng.lng + ',' + e.latlng.lat +
-      '&geometryType=esriGeometryPoint&sr=4326&layers=visible&tolerance=10' +
+      '&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=10' +
       '&mapExtent=' + b.getWest() + ',' + b.getSouth() + ',' + b.getEast() + ',' + b.getNorth() +
-      '&imageDisplay=' + s.x + ',' + s.y + ',96&returnGeometry=false&f=json';
+      '&imageDisplay=' + s.x + ',' + s.y + ',96&returnGeometry=true&f=json';
     try {
       const resp = await fetch('https://gis.cjgorj.ro/proxy/proxy.ashx?' + identifyUrl);
       const data = await resp.json();
       if (data.results && data.results.length > 0) {
-        const all = data.results;
-        const attrs = {};
-        all.forEach(r => {
-          if (r.layerName) attrs['_Strat'] = r.layerName;
-          Object.entries(r.attributes || {}).forEach(([k, v]) => {
-            if (v !== null && v !== '' && v !== 'Null') attrs[k] = v;
-          });
-        });
+        const r = data.results[0];
+        const attrs = r.attributes || {};
+
+        // Desenează geometria selectată
+        if (r.geometry) {
+          const latlngs = arcgisToLatLngs(r.geometry);
+          if (latlngs) {
+            pugHighlight = L.polygon(latlngs, {
+              color: '#ffeb3b', weight: 3, fillColor: '#ffeb3b',
+              fillOpacity: 0.25, dashArray: '6,4', interactive: false
+            }).addTo(map);
+          }
+        }
+
+        // Construiește panoul de atribute
         document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
-        document.getElementById('attrLayerName').textContent = all[0].layerName || 'PUG';
-        document.getElementById('attrGeomType').textContent = all[0].geometryType || 'Zonă';
-        const entries = Object.entries(attrs).filter(([,v]) => v !== null && v !== undefined);
+        document.getElementById('attrLayerName').textContent = attrs['SYMBOL'] || attrs['Simbol'] || attrs['simbol'] || r.layerName || 'PUG';
+        document.getElementById('attrGeomType').textContent = r.layerName || 'Zonă funcțională';
+
+        // Afișează toate atributele
+        const entries = Object.entries(attrs).filter(([,v]) =>
+          v !== null && v !== undefined && v !== '' && v !== 'Null' && v !== 'null');
         document.getElementById('attrScroll').innerHTML = entries.length === 0
           ? '<div class="attr-empty">Niciun atribut disponibil</div>'
           : '<table class="attr-tbl"><tbody>' + entries.map(([k,v]) =>
@@ -1608,6 +1632,13 @@ const ArcGISDynamic = L.Layer.extend({
       console.warn('PUG identify error:', err);
     }
   });
+
+  // Curăță selecția când se închide panoul de atribute
+  const origCloseAttr = window.closeAttr;
+  window.closeAttr = function() {
+    clearPugHighlight();
+    origCloseAttr();
+  };
 })();
 
 // ═══════════════════════════════════════════════════════════════════
