@@ -512,7 +512,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 const CATEGORIES = [
   { id:'cadastru',  icon:'📍', label:'Cadastru',               color:'#e8a838' },
   { id:'urbanism',  icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'drumuri',   icon:'🛣', label:'Drumuri',                 color:'#e74c3c' },
+  { id:'drumuri',   icon:'🛣', label:'Transport',               color:'#e74c3c' },
   { id:'utilitati', icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
   { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
@@ -1697,6 +1697,74 @@ async function loadStereo70Zip(url) {
       static: true
     });
   } catch(e) { console.error('Eroare ANCOM', e); }
+})();
+
+// ── Strat static Căi Ferate ─────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/cai_ferate.zip');
+    addLayer({
+      id: 'static_cai_ferate',
+      name: 'Căi Ferate',
+      cat: 'drumuri',
+      color: '#7f8c8d',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Căi Ferate', e); }
+})();
+
+// ── Strat static Căi Rutiere ────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/cai_rutiere.zip');
+    addLayer({
+      id: 'static_cai_rutiere',
+      name: 'Căi Rutiere',
+      cat: 'drumuri',
+      color: '#f39c12',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Căi Rutiere', e); }
+})();
+
+// ── Strat static Cursuri Apă ────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/cursuri_apa.zip');
+    addLayer({
+      id: 'static_cursuri_apa',
+      name: 'Cursuri Apă',
+      cat: 'mediu',
+      color: '#3498db',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Cursuri Apă', e); }
+})();
+
+// ── Strat static Lacuri ─────────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/lacuri.zip');
+    addLayer({
+      id: 'static_lacuri',
+      name: 'Lacuri',
+      cat: 'mediu',
+      color: '#2980b9',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare Lacuri', e); }
 })();
 
 // ── Strat static Limite Intravilan ──────────────────────────────────
