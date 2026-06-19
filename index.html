@@ -806,6 +806,7 @@ function toggleLayer(id) {
   if (!layer) return;
   layer.visible = !layer.visible;
   layer.visible ? layer.leafletLayer.addTo(map) : map.removeLayer(layer.leafletLayer);
+  if (layer._isFgb) scheduleFgbRefresh();
   renderTree();
   scheduleLabels();
 }
@@ -830,6 +831,7 @@ function setAllVisible(v) {
     l.visible = v;
     v ? l.leafletLayer.addTo(map) : map.removeLayer(l.leafletLayer);
   });
+  scheduleFgbRefresh();
   renderTree();
 }
 
@@ -953,7 +955,7 @@ function toggleCat(id) {
 }
 
 function toggleGroup(gid) {
-  GROUP_STATE[gid] = !(GROUP_STATE[gid] ?? true);
+  GROUP_STATE[gid] = !(GROUP_STATE[gid] ?? false);
   renderTree();
 }
 
@@ -1400,7 +1402,8 @@ async function loadCadSearchIndex() {
 }
 
 // Creează un layer FGB streaming (fără date inițiale)
-function createFgbLayer(id, name, color, fgbUrl) {
+function createFgbLayer(id, name, color, fgbUrl, opts) {
+  opts = opts || {};
   const style = () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
   const onEach = (f, lyr) => {
     lyr.on('click', e => { L.DomEvent.stopPropagation(e); if (activeTool === 'pan') showAttr(f, FGB_LAYERS[id]); });
@@ -1408,19 +1411,26 @@ function createFgbLayer(id, name, color, fgbUrl) {
     lyr.on('mouseout',  function() { this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 }); });
   };
 
-  const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach }); // nu adăugat pe hartă implicit
+  const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach });
 
-  // Obiect pseudo-layer pentru compatibilitate cu renderTree / showAttr
   const layerObj = {
-    id, name, cat:'cadastru', color, format:'SHP',
+    id, name, cat: opts.cat || 'cadastru', color, format:'SHP',
     geojson: { type:'FeatureCollection', features:[] },
     visible: false,
     static: true,
     _isFgb: true,
-    _withLabels: (id === 'static_parcele'),
+    _fgbMinZoom: opts.minZoom ?? FGB_MIN_ZOOM,
+    _withLabels: opts._withLabels || false,
+    _labelField: opts._labelField,
+    _labelMinZoom: opts._labelMinZoom,
     leafletLayer: geoLayer,
     fgbUrl
   };
+  if (opts.group) {
+    layerObj.group = opts.group;
+    layerObj.groupLabel = opts.groupLabel;
+    layerObj.groupColor = opts.groupColor;
+  }
   FGB_LAYERS[id] = layerObj;
   layers.push(layerObj);
   renderTree();
@@ -1430,21 +1440,18 @@ function createFgbLayer(id, name, color, fgbUrl) {
 // Încarcă features FGB pentru bbox curent
 let fgbLoadTimer = null;
 async function refreshFgbLayers() {
-  if (map.getZoom() < FGB_MIN_ZOOM) {
-    // Sub zoom minim — golim toate layerele FGB
-    for (const id in FGB_LAYERS) {
-      const l = FGB_LAYERS[id];
-      if (l.visible) { l.leafletLayer.clearLayers(); l.geojson.features = []; }
-    }
-    scheduleLabels();
-    return;
-  }
+  const zoom = map.getZoom();
   const b = map.getBounds();
   const rect = { minX: b.getWest(), minY: b.getSouth(), maxX: b.getEast(), maxY: b.getNorth() };
 
   for (const id in FGB_LAYERS) {
     const l = FGB_LAYERS[id];
     if (!l.visible) continue;
+    const minZ = l._fgbMinZoom ?? FGB_MIN_ZOOM;
+    if (zoom < minZ) {
+      l.leafletLayer.clearLayers(); l.geojson.features = [];
+      continue;
+    }
     try {
       const resp = await fetch(l.fgbUrl);
       const features = [];
@@ -1465,11 +1472,40 @@ function scheduleFgbRefresh() {
 }
 
 async function loadStaticLayers() {
-  createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb');
+  // ── Cadastru ──
+  createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb', { _withLabels: true });
   createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
+  createFgbLayer('static_uat_gorj',    'Limite UAT Gorj', '#e74c3c', 'DATA/UAT_GORJ.fgb', { minZoom:8, _withLabels:true, _labelField:'name', _labelMinZoom:9 });
+
+  // ── Rețele Transport (ordinea: TRANSELECTRICA, TRANSGAZ, ROMGAZ, OMV, CONPET) ──
+  createFgbLayer('static_conpet',        'CONPET',         '#6c3483', 'DATA/CONPET.fgb',        { cat:'transport', minZoom:9 });
+  createFgbLayer('static_omv',           'OMV',            '#1a5276', 'DATA/OMV.fgb',            { cat:'transport', minZoom:9 });
+  createFgbLayer('static_romgaz',        'ROMGAZ',         '#c8a415', 'DATA/ROMGAZ.fgb',         { cat:'transport', minZoom:9 });
+  createFgbLayer('static_transgaz',      'TRANSGAZ',       '#ffeb3b', 'DATA/TRANSGAZ.fgb',       { cat:'transport', minZoom:9 });
+  createFgbLayer('static_transelectrica','TRANSELECTRICA',  '#e74c3c', 'DATA/TRANSELECTRICA.fgb', { cat:'transport', minZoom:9 });
+
+  // ── Rețele Utilități ──
+  createFgbLayer('static_orange_aerian',  'Aerian',   '#ff6d00', 'DATA/OrangeAerian.fgb',  { cat:'utilitati', minZoom:10, group:'orange', groupLabel:'ORANGE', groupColor:'#ff6d00' });
+  createFgbLayer('static_orange_subteran','Subteran',  '#e65100', 'DATA/OrangeSubteran.fgb',{ cat:'utilitati', minZoom:10, group:'orange', groupLabel:'ORANGE', groupColor:'#ff6d00' });
+  createFgbLayer('static_ancom',          'ANCOM',     '#00bfa5', 'DATA/ANCOM.fgb',         { cat:'utilitati', minZoom:10 });
+  createFgbLayer('static_aparegio_apa',   'Apă',       '#2196f3', 'DATA/APAREGIO_APA.fgb',  { cat:'utilitati', minZoom:10, group:'aparegio', groupLabel:'APAREGIO', groupColor:'#2196f3' });
+  createFgbLayer('static_aparegio_canal', 'Canal',     '#8d6e63', 'DATA/APAREGIO_CANAL.fgb',{ cat:'utilitati', minZoom:10, group:'aparegio', groupLabel:'APAREGIO', groupColor:'#2196f3' });
+
+  // ── Transport (Drumuri) ──
+  createFgbLayer('static_cai_ferate',  'Căi Ferate',  '#7f8c8d', 'DATA/cai_ferate.fgb',  { cat:'drumuri', minZoom:9 });
+  createFgbLayer('static_cai_rutiere', 'Căi Rutiere', '#f39c12', 'DATA/cai_rutiere.fgb', { cat:'drumuri', minZoom:9 });
+
+  // ── Mediu ──
+  createFgbLayer('static_cursuri_apa', 'Cursuri Apă', '#3498db', 'DATA/cursuri_apa.fgb', { cat:'mediu', minZoom:9 });
+  createFgbLayer('static_lacuri',      'Lacuri',      '#2980b9', 'DATA/lacuri.fgb',      { cat:'mediu', minZoom:9 });
+  createFgbLayer('static_natura2000',  'Sit Natura 2000', '#27ae60', 'DATA/SIT_NATURA2000.fgb', { cat:'mediu', minZoom:8, _withLabels:true, _labelField:'SitName', _labelMinZoom:11 });
+
+  // ── Urbanism ──
+  createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6', 'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
+
   map.on('moveend zoomend', scheduleFgbRefresh);
-  loadCadSearchIndex();   // paralel, nu blocheaza
-  scheduleFgbRefresh();   // incarca features pentru viewport curent
+  loadCadSearchIndex();
+  scheduleFgbRefresh();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1529,305 +1565,8 @@ const ArcGISDynamic = L.Layer.extend({
   }
 });
 
-// ── Limite UAT Gorj ──────────────────────────────────────────────────
-(async function() {
-  try {
-    const resp = await fetch('DATA/UAT_GORJ.geojson');
-    if (!resp.ok) return;
-    const fc = await resp.json();
-    addLayer({
-      id: 'static_uat_gorj',
-      name: 'Limite UAT Gorj',
-      cat: 'cadastru',
-      color: '#e74c3c',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true,
-      _withLabels: true,
-      _labelField: 'name',
-      _labelMinZoom: 9
-    });
-  } catch(e) { console.error('Eroare UAT Gorj', e); }
-})();
-
-// Helper: parsează SHP zip fără reproiecție automată, apoi reproiectează cu Stereo70 corect
-async function loadStereo70Zip(url) {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Fetch failed');
-  const buf = await resp.arrayBuffer();
-  const zip = await JSZip.loadAsync(buf);
-  let shpBuf = null, dbfBuf = null;
-  for (const name of Object.keys(zip.files)) {
-    const ext = name.split('.').pop().toLowerCase();
-    if (ext === 'shp') shpBuf = await zip.files[name].async('arraybuffer');
-    if (ext === 'dbf') dbfBuf = await zip.files[name].async('arraybuffer');
-  }
-  if (!shpBuf) throw new Error('No .shp in zip');
-  const geoms = await shp.parseShp(shpBuf);
-  let features;
-  if (dbfBuf) {
-    const attrs = await shp.parseDbf(dbfBuf);
-    features = geoms.map((g, i) => ({ type:'Feature', geometry:g, properties:attrs[i]||{} }));
-  } else {
-    features = geoms.map(g => ({ type:'Feature', geometry:g, properties:{} }));
-  }
-  const fc = { type:'FeatureCollection', features };
-  return await reprojectAsync(fc, 'EPSG:31700');
-}
-
-// ── Straturi statice Rețele Transport (ordine: TRANSELECTRICA, TRANSGAZ, ROMGAZ, OMV, CONPET)
-(async function() {
-  // CONPET (Stereo70)
-  try {
-    const fc = await loadStereo70Zip('DATA/Conducte_CONPET.zip');
-    addLayer({ id:'static_conpet', name:'CONPET', cat:'transport', color:'#6c3483', format:'SHP', geojson:fc, visible:false, static:true });
-  } catch(e) { console.error('Eroare CONPET', e); }
-
-  // OMV (Stereo70)
-  try {
-    const fc = await loadStereo70Zip('DATA/Conducte_OMV.zip');
-    addLayer({ id:'static_omv', name:'OMV', cat:'transport', color:'#1a5276', format:'SHP', geojson:fc, visible:false, static:true });
-  } catch(e) { console.error('Eroare OMV', e); }
-
-  // ROMGAZ (Stereo70)
-  try {
-    const fc = await loadStereo70Zip('DATA/ROMGAZ.zip');
-    addLayer({ id:'static_romgaz', name:'ROMGAZ', cat:'transport', color:'#c8a415', format:'SHP', geojson:fc, visible:false, static:true });
-  } catch(e) { console.error('Eroare Romgaz', e); }
-
-  // TRANSGAZ (WGS84)
-  try {
-    const resp = await fetch('DATA/Transgaz_SHP.zip');
-    if (resp.ok) {
-      const buf = await resp.arrayBuffer();
-      const results = await shp(buf);
-      const arr = Array.isArray(results) ? results : [results];
-      const allFeatures = arr.flatMap(fc => fc.features || []);
-      addLayer({ id:'static_transgaz', name:'TRANSGAZ', cat:'transport', color:'#ffeb3b', format:'SHP',
-        geojson:{ type:'FeatureCollection', features:allFeatures }, visible:false, static:true });
-    }
-  } catch(e) { console.error('Eroare Transgaz', e); }
-
-  // TRANSELECTRICA (Stereo70)
-  try {
-    const fc = await loadStereo70Zip('DATA/TRANSELECTRICA.zip');
-    addLayer({ id:'static_transelectrica', name:'TRANSELECTRICA', cat:'transport', color:'#e74c3c', format:'SHP', geojson:fc, visible:false, static:true });
-  } catch(e) { console.error('Eroare Transelectrica', e); }
-})();
-
-// ── Strat static Orange Aerian ──────────────────────────────────────
-(async function() {
-  try {
-    const resp = await fetch('DATA/OrangeAerian.zip');
-    if (!resp.ok) return;
-    const buf = await resp.arrayBuffer();
-    const results = await shp(buf);
-    const arr = Array.isArray(results) ? results : [results];
-    const allFeatures = arr.flatMap(fc => fc.features || []);
-    addLayer({
-      id: 'static_orange_aerian',
-      name: 'Aerian',
-      cat: 'utilitati',
-      color: '#ff6d00',
-      format: 'SHP',
-      geojson: { type:'FeatureCollection', features: allFeatures },
-      visible: false,
-      static: true,
-      group: 'orange',
-      groupLabel: 'ORANGE',
-      groupColor: '#ff6d00'
-    });
-  } catch(e) { console.error('Eroare Orange Aerian', e); }
-})();
-
-// ── Strat static Orange Subteran ────────────────────────────────────
-(async function() {
-  try {
-    const resp = await fetch('DATA/OrangeSubteran.zip');
-    if (!resp.ok) return;
-    const buf = await resp.arrayBuffer();
-    const results = await shp(buf);
-    const arr = Array.isArray(results) ? results : [results];
-    const allFeatures = arr.flatMap(fc => fc.features || []);
-    addLayer({
-      id: 'static_orange_subteran',
-      name: 'Subteran',
-      cat: 'utilitati',
-      color: '#e65100',
-      format: 'SHP',
-      geojson: { type:'FeatureCollection', features: allFeatures },
-      visible: false,
-      static: true,
-      group: 'orange',
-      groupLabel: 'ORANGE',
-      groupColor: '#ff6d00'
-    });
-  } catch(e) { console.error('Eroare Orange Subteran', e); }
-})();
-
-// ── Strat static ANCOM ──────────────────────────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/ANCOM.zip');
-    addLayer({
-      id: 'static_ancom',
-      name: 'ANCOM',
-      cat: 'utilitati',
-      color: '#00bfa5',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare ANCOM', e); }
-})();
-
-// ── Straturi statice APAREGIO (Apă + Canal) ─────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/APAREGIO_APA.zip');
-    addLayer({
-      id: 'static_aparegio_apa',
-      name: 'Apă',
-      cat: 'utilitati',
-      color: '#2196f3',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true,
-      group: 'aparegio',
-      groupLabel: 'APAREGIO',
-      groupColor: '#2196f3'
-    });
-  } catch(e) { console.error('Eroare APAREGIO Apă', e); }
-
-  try {
-    const fc = await loadStereo70Zip('DATA/APAREGIO_CANAL.zip');
-    addLayer({
-      id: 'static_aparegio_canal',
-      name: 'Canal',
-      cat: 'utilitati',
-      color: '#8d6e63',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true,
-      group: 'aparegio',
-      groupLabel: 'APAREGIO',
-      groupColor: '#2196f3'
-    });
-  } catch(e) { console.error('Eroare APAREGIO Canal', e); }
-})();
-
-// ── Strat static Căi Ferate ─────────────────────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/cai_ferate.zip');
-    addLayer({
-      id: 'static_cai_ferate',
-      name: 'Căi Ferate',
-      cat: 'drumuri',
-      color: '#7f8c8d',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare Căi Ferate', e); }
-})();
-
-// ── Strat static Căi Rutiere ────────────────────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/cai_rutiere.zip');
-    addLayer({
-      id: 'static_cai_rutiere',
-      name: 'Căi Rutiere',
-      cat: 'drumuri',
-      color: '#f39c12',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare Căi Rutiere', e); }
-})();
-
-// ── Strat static Cursuri Apă ────────────────────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/cursuri_apa.zip');
-    addLayer({
-      id: 'static_cursuri_apa',
-      name: 'Cursuri Apă',
-      cat: 'mediu',
-      color: '#3498db',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare Cursuri Apă', e); }
-})();
-
-// ── Strat static Lacuri ─────────────────────────────────────────────
-(async function() {
-  try {
-    const fc = await loadStereo70Zip('DATA/lacuri.zip');
-    addLayer({
-      id: 'static_lacuri',
-      name: 'Lacuri',
-      cat: 'mediu',
-      color: '#2980b9',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare Lacuri', e); }
-})();
-
-// ── Strat static Limite Intravilan ──────────────────────────────────
-(async function() {
-  try {
-    const resp = await fetch('DATA/LIMITA_INTRAVILAN.geojson');
-    if (!resp.ok) return;
-    const fc = await resp.json();
-    addLayer({
-      id: 'static_intravilan',
-      name: 'Limite Intravilan',
-      cat: 'urbanism',
-      color: '#9b59b6',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true
-    });
-  } catch(e) { console.error('Eroare Intravilan', e); }
-})();
-
-// ── Strat static Sit Natura 2000 ────────────────────────────────────
-(async function() {
-  try {
-    const resp = await fetch('DATA/SIT_NATURA2000.geojson');
-    if (!resp.ok) return;
-    const fc = await resp.json();
-    addLayer({
-      id: 'static_natura2000',
-      name: 'Sit Natura 2000',
-      cat: 'mediu',
-      color: '#27ae60',
-      format: 'SHP',
-      geojson: fc,
-      visible: false,
-      static: true,
-      _withLabels: true,
-      _labelField: 'SitName',
-      _labelMinZoom: 11
-    });
-  } catch(e) { console.error('Eroare Natura 2000', e); }
-})();
+// All static layers (UAT, transport, utilities, mediu, urbanism) are now loaded
+// as FlatGeobuf via createFgbLayer() in loadStaticLayers() above.
 
 // ── Strat static DEO (Distribuție Oltenia) ──────────────────────────
 (function() {
