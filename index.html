@@ -1508,6 +1508,7 @@ async function loadStaticLayers() {
   // ── Proiecte ──
   createFgbLayer('static_vo_balesti',  'VO Bălești',   '#ff7043', 'DATA/VO_Balesti.fgb',  { cat:'proiecte', minZoom:9 });
   createFgbLayer('static_drum_expres', 'Drum Expres',  '#42a5f5', 'DATA/Drum_expres.fgb', { cat:'proiecte', minZoom:9 });
+  createFgbLayer('static_transgaz_tetila', 'Transgaz Tetila-Vâlcea', '#fdd835', 'DATA/Transgaz_Tetila_Valcea.fgb', { cat:'proiecte', minZoom:9 });
 
   map.on('moveend zoomend', scheduleFgbRefresh);
   loadCadSearchIndex();
