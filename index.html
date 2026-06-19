@@ -1502,9 +1502,6 @@ async function loadStaticLayers() {
   createFgbLayer('static_lacuri',      'Lacuri',      '#2980b9', 'DATA/lacuri.fgb',      { cat:'mediu', minZoom:9 });
   createFgbLayer('static_natura2000',  'Sit Natura 2000', '#27ae60', 'DATA/SIT_NATURA2000.fgb', { cat:'mediu', minZoom:8, _withLabels:true, _labelField:'SitName', _labelMinZoom:11 });
 
-  // ── Urbanism ──
-  createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6', 'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
-
   // ── Proiecte ──
   createFgbLayer('static_vo_balesti',  'VO Bălești',   '#ff7043', 'DATA/VO_Balesti.fgb',  { cat:'proiecte', minZoom:9 });
   createFgbLayer('static_drum_expres', 'Drum Expres',  '#42a5f5', 'DATA/Drum_expres.fgb', { cat:'proiecte', minZoom:9 });
@@ -1596,29 +1593,9 @@ const ArcGISDynamic = L.Layer.extend({
   renderTree();
 })();
 
-// ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
+// ── Straturi Urbanism — CJ Gorj ArcGIS ────────
 (function() {
-  const pugDyn = new ArcGISDynamic(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    { opacity: 0.85, attribution: '© CJ Gorj',
-      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
-      layers: 0 }
-  );
-  const pugLayer = {
-    id: 'static_pug',
-    name: 'PUG',
-    cat: 'urbanism',
-    color: '#e74c3c',
-    format: 'WMS',
-    geojson: { type:'FeatureCollection', features:[] },
-    visible: false,
-    static: true,
-    _isTile: true,
-    leafletLayer: pugDyn,
-  };
-  layers.push(pugLayer);
-
-  // Zone Protecție — MapServer layer 1
+  // Zone Protecție — MapServer layer 1 (added first → appears last in sidebar)
   const zpDyn = new ArcGISDynamic(
     'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
     { opacity: 0.85, attribution: '© CJ Gorj',
@@ -1645,7 +1622,7 @@ const ArcGISDynamic = L.Layer.extend({
       proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
       layers: 2 }
   );
-  layers.push({
+  const puzLayer = {
     id: 'static_puz',
     name: 'PUZ',
     cat: 'urbanism',
@@ -1656,7 +1633,32 @@ const ArcGISDynamic = L.Layer.extend({
     static: true,
     _isTile: true,
     leafletLayer: puzDyn,
-  });
+  };
+  layers.push(puzLayer);
+
+  // PUG — MapServer layer 0
+  const pugDyn = new ArcGISDynamic(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    { opacity: 0.85, attribution: '© CJ Gorj',
+      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
+      layers: 0 }
+  );
+  const pugLayer = {
+    id: 'static_pug',
+    name: 'PUG',
+    cat: 'urbanism',
+    color: '#e74c3c',
+    format: 'WMS',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isTile: true,
+    leafletLayer: pugDyn,
+  };
+  layers.push(pugLayer);
+
+  // Limite Intravilan (added last → appears first in sidebar)
+  createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6', 'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
   renderTree();
 
   // Geometria selectată pe hartă
@@ -1674,13 +1676,16 @@ const ArcGISDynamic = L.Layer.extend({
 
   // Identify on click — trimite request la MapServer prin proxy
   map.on('click', async function(e) {
-    if (!pugLayer.visible || activeTool !== 'pan') return;
+    if ((!pugLayer.visible && !puzLayer.visible) || activeTool !== 'pan') return;
     clearPugHighlight();
     const b = map.getBounds();
     const s = map.getSize();
+    const visLayers = [];
+    if (pugLayer.visible) visLayers.push(0);
+    if (puzLayer.visible) visLayers.push(2);
     const identifyUrl = 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/identify' +
       '?geometry=' + e.latlng.lng + ',' + e.latlng.lat +
-      '&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=10' +
+      '&geometryType=esriGeometryPoint&sr=4326&layers=visible:' + visLayers.join(',') + '&tolerance=10' +
       '&mapExtent=' + b.getWest() + ',' + b.getSouth() + ',' + b.getEast() + ',' + b.getNorth() +
       '&imageDisplay=' + s.x + ',' + s.y + ',96&returnGeometry=true&f=json';
     try {
@@ -1709,7 +1714,7 @@ const ArcGISDynamic = L.Layer.extend({
         const utr = attrs['utr'] || attrs['UTR'] || '';
 
         document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
-        document.getElementById('attrLayerName').textContent = utrAfisare || r.layerName || 'PUG';
+        document.getElementById('attrLayerName').textContent = utrAfisare || r.layerName || (r.layerId === 2 ? 'PUZ' : 'PUG');
         document.getElementById('attrGeomType').textContent = utr || 'Zonă funcțională';
 
         const entries = Object.entries(attrs).filter(([,v]) =>
