@@ -1421,10 +1421,12 @@ const ArcGISDynamic = L.Layer.extend({
     const map = this._map;
     const size = map.getSize();
     const b = map.getBounds();
-    const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+    const sw = L.CRS.EPSG3857.project(b.getSouthWest());
+    const ne = L.CRS.EPSG3857.project(b.getNorthEast());
+    const bbox = `${sw.x},${sw.y},${ne.x},${ne.y}`;
     const layersParam = this.options.layers != null ? `&layers=show:${this.options.layers}` : '';
-    const exportUrl = `${this._url}/export?bbox=${bbox}&bboxSR=4326${layersParam}`+
-      `&size=${size.x},${size.y}&imageSR=4326&format=png32&transparent=true&dpi=96&f=image`;
+    const exportUrl = `${this._url}/export?bbox=${bbox}&bboxSR=3857${layersParam}`+
+      `&size=${size.x},${size.y}&imageSR=3857&format=png32&transparent=true&dpi=96&f=image`;
     const url = this.options.proxy ? this.options.proxy + encodeURIComponent(exportUrl) : exportUrl;
 
     const nw = map.latLngToLayerPoint(b.getNorthWest());
