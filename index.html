@@ -1573,6 +1573,40 @@ const ArcGISDynamic = L.Layer.extend({
   } catch(e) { console.error('Eroare Transgaz', e); }
 })();
 
+// ── Strat static OMV ────────────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/Conducte_OMV.zip');
+    addLayer({
+      id: 'static_omv',
+      name: 'OMV',
+      cat: 'transport',
+      color: '#1a5276',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare OMV', e); }
+})();
+
+// ── Strat static CONPET ─────────────────────────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/Conducte_CONPET.zip');
+    addLayer({
+      id: 'static_conpet',
+      name: 'CONPET',
+      cat: 'transport',
+      color: '#6c3483',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true
+    });
+  } catch(e) { console.error('Eroare CONPET', e); }
+})();
+
 // Helper: parsează SHP zip fără reproiecție automată, apoi reproiectează cu Stereo70 corect
 async function loadStereo70Zip(url) {
   const resp = await fetch(url);
