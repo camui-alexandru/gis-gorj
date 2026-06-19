@@ -69,9 +69,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .layer-opacity input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
 .layer-opacity span{font-size:10px;color:var(--muted);min-width:28px;text-align:right}
 .badge{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;color:#fff;flex-shrink:0}
-.layer-group-hdr{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 20px;border-bottom:1px solid #0d1828;cursor:pointer;user-select:none}
+.layer-group-hdr{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 28px;border-bottom:1px solid #0d1828;cursor:pointer;user-select:none}
 .layer-group-hdr:hover{background:var(--panel2)}
-.layer-group-hdr .grp-arrow{font-size:9px;color:var(--muted);width:10px}
+.layer-group-hdr .grp-arrow{font-size:9px;color:var(--muted);width:8px;flex-shrink:0}
 .layer-group-hdr .grp-vis{cursor:pointer;font-size:12px;color:var(--muted);flex-shrink:0;width:14px;text-align:center}
 .layer-group-hdr .grp-vis.on{color:var(--accent2)}
 .layer-group-hdr .grp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -896,7 +896,7 @@ function renderTree() {
         if (rendered.has(l.group)) return;
         rendered.add(l.group);
         const g = groups[l.group];
-        const gOpen = GROUP_STATE[l.group] ?? true;
+        const gOpen = GROUP_STATE[l.group] ?? false;
         const gVis = g.members.some(m => m.visible);
         bodyHTML += `<div class="layer-group-hdr" onclick="toggleGroup('${l.group}')">
           <span class="grp-arrow">${gOpen ? '▾' : '▸'}</span>
