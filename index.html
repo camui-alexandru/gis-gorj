@@ -1735,16 +1735,9 @@ async function loadStereo70Zip(url) {
 
   // Încarcă regimul tehnic de la CJ Gorj (iframe — cookie-uri gis.cjgorj.ro trimise automat)
   window.loadRegimTehnic = function(utrPug) {
-    const container = document.getElementById('regimTehnicContent');
-    if (!container) return;
     const url = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
       '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
-    container.innerHTML =
-      '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
-        '<div style="font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:6px">Regim Tehnic</div>' +
-        '<iframe src="' + url + '" style="width:100%;min-height:400px;border:1px solid var(--border);' +
-          'border-radius:6px;background:#fff"></iframe>' +
-      '</div>';
+    window.open(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
   };
 
   // Curăță selecția când se închide panoul de atribute
