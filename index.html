@@ -69,6 +69,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .layer-opacity input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
 .layer-opacity span{font-size:10px;color:var(--muted);min-width:28px;text-align:right}
 .badge{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;color:#fff;flex-shrink:0}
+.layer-group-hdr{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 20px;border-bottom:1px solid #0d1828;cursor:pointer;user-select:none}
+.layer-group-hdr:hover{background:var(--panel2)}
+.layer-group-hdr .grp-arrow{font-size:9px;color:var(--muted);width:10px}
+.layer-group-hdr .grp-vis{cursor:pointer;font-size:12px;color:var(--muted);flex-shrink:0;width:14px;text-align:center}
+.layer-group-hdr .grp-vis.on{color:var(--accent2)}
+.layer-group-hdr .grp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.layer-group-hdr .grp-label{flex:1;font-size:12px;font-weight:700;color:var(--text)}
+.layer-group-body{overflow:hidden;transition:max-height .2s}
+.layer-group-body.closed{max-height:0}
+.layer-group-body .layer-row{padding-left:42px}
+.layer-group-body .layer-opacity{padding-left:42px}
 .sb-empty{padding:20px 12px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center}
 .sb-footer{border-top:1px solid var(--border);padding:8px 10px;display:flex;gap:6px}
 .sf-btn{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:5px;border-radius:5px;cursor:pointer;font-size:11px;text-align:center}
@@ -526,6 +537,7 @@ const PRESETS = [
 
 const CAT_STATE = {}; // { catId: { open: bool } }
 CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
+const GROUP_STATE = {};
 
 let layers = []; // { id, name, cat, color, format, geojson, visible, leafletLayer }
 let selectedFile = null, selectedFiles = {};
@@ -840,12 +852,67 @@ function renderTree() {
   const q = filterText;
   let total = 0;
 
+  function layerRowHTML(l) {
+    return `<div class="layer-row" id="lr_${l.id}">
+      <span class="layer-vis ${l.visible ? 'on' : ''}" onclick="toggleLayer('${l.id}')" title="${l.visible ? 'Ascunde' : 'Arată'}">
+        ${l.visible ? '👁' : '○'}
+      </span>
+      <span class="layer-color-dot" style="background:${l.color}" onclick="openColorPopup('${l.id}', event)" title="Schimbă culoare"></span>
+      <span class="layer-label" title="${l.name}">${l.name}</span>
+      <span class="badge" style="background:${l.format==='SHP'?'#1a8a6a':l.format==='DXF'?'#8a6a1a':'#3a5a8a'}">${l.format}</span>
+      <div class="layer-actions">
+        ${l._isTile ? '' : `<button class="la-btn" onclick="zoomToLayer('${l.id}')" title="Zoom la strat">⛶</button>`}
+        ${l.static ? '' : `<button class="la-btn" onclick="removeLayer('${l.id}')" title="Șterge">✕</button>`}
+      </div>
+    </div>
+    ${l.visible ? `<div class="layer-opacity">
+      <input type="range" min="0" max="100" value="${Math.round((l._opacity ?? 1) * 100)}" oninput="setLayerOpacity('${l.id}', this.value / 100, this)"/>
+      <span>${Math.round((l._opacity ?? 1) * 100)}%</span>
+    </div>` : ''}`;
+  }
+
   tree.innerHTML = CATEGORIES.map(cat => {
     const catLayers = layers.filter(l => l.cat === cat.id && (!q || l.name.toLowerCase().includes(q)));
     if (q && !catLayers.length) return '';
     total += catLayers.length;
     const open = CAT_STATE[cat.id].open;
     const visCount = catLayers.filter(l => l.visible).length;
+
+    const reversed = [...catLayers].reverse();
+    const groups = {};
+    const ungrouped = [];
+    reversed.forEach(l => {
+      if (l.group) {
+        if (!groups[l.group]) groups[l.group] = { label: l.groupLabel || l.group.toUpperCase(), color: l.groupColor || l.color, members: [] };
+        groups[l.group].members.push(l);
+      } else ungrouped.push(l);
+    });
+
+    let bodyHTML = '';
+    if (!catLayers.length) bodyHTML = `<div style="padding:6px 28px;font-size:11px;color:var(--muted)">— niciun strat —</div>`;
+    const rendered = new Set();
+    reversed.forEach(l => {
+      if (l.group) {
+        if (rendered.has(l.group)) return;
+        rendered.add(l.group);
+        const g = groups[l.group];
+        const gOpen = GROUP_STATE[l.group] ?? true;
+        const gVis = g.members.some(m => m.visible);
+        bodyHTML += `<div class="layer-group-hdr" onclick="toggleGroup('${l.group}')">
+          <span class="grp-arrow">${gOpen ? '▾' : '▸'}</span>
+          <span class="grp-vis ${gVis ? 'on' : ''}" onclick="event.stopPropagation();toggleGroupVis('${l.group}')" title="${gVis ? 'Ascunde tot' : 'Arată tot'}">
+            ${gVis ? '👁' : '○'}
+          </span>
+          <span class="grp-dot" style="background:${g.color}"></span>
+          <span class="grp-label">${g.label}</span>
+        </div>
+        <div class="layer-group-body ${gOpen ? '' : 'closed'}">
+          ${g.members.map(m => layerRowHTML(m)).join('')}
+        </div>`;
+      } else {
+        bodyHTML += layerRowHTML(l);
+      }
+    });
 
     return `
     <div class="cat-block" id="cat_${cat.id}">
@@ -856,25 +923,7 @@ function renderTree() {
         <span class="cat-arrow">${open ? '▾' : '▸'}</span>
       </div>
       <div class="cat-body ${open ? '' : 'closed'}">
-        ${catLayers.length === 0 ? `<div style="padding:6px 28px;font-size:11px;color:var(--muted)">— niciun strat —</div>` : ''}
-        ${[...catLayers].reverse().map(l => `
-          <div class="layer-row" id="lr_${l.id}">
-            <span class="layer-vis ${l.visible ? 'on' : ''}" onclick="toggleLayer('${l.id}')" title="${l.visible ? 'Ascunde' : 'Arată'}">
-              ${l.visible ? '👁' : '○'}
-            </span>
-            <span class="layer-color-dot" style="background:${l.color}" onclick="openColorPopup('${l.id}', event)" title="Schimbă culoare"></span>
-            <span class="layer-label" title="${l.name}">${l.name}</span>
-            <span class="badge" style="background:${l.format==='SHP'?'#1a8a6a':l.format==='DXF'?'#8a6a1a':'#3a5a8a'}">${l.format}</span>
-            <div class="layer-actions">
-              ${l._isTile ? '' : `<button class="la-btn" onclick="zoomToLayer('${l.id}')" title="Zoom la strat">⛶</button>`}
-              ${l.static ? '' : `<button class="la-btn" onclick="removeLayer('${l.id}')" title="Șterge">✕</button>`}
-            </div>
-          </div>
-          ${l.visible ? `<div class="layer-opacity">
-            <input type="range" min="0" max="100" value="${Math.round((l._opacity ?? 1) * 100)}" oninput="setLayerOpacity('${l.id}', this.value / 100, this)"/>
-            <span>${Math.round((l._opacity ?? 1) * 100)}%</span>
-          </div>` : ''}
-        `).join('')}
+        ${bodyHTML}
       </div>
     </div>`;
   }).join('');
@@ -901,6 +950,17 @@ function setLayerOpacity(id, opacity, slider) {
 function toggleCat(id) {
   CAT_STATE[id].open = !CAT_STATE[id].open;
   renderTree();
+}
+
+function toggleGroup(gid) {
+  GROUP_STATE[gid] = !(GROUP_STATE[gid] ?? true);
+  renderTree();
+}
+
+function toggleGroupVis(gid) {
+  const members = layers.filter(l => l.group === gid);
+  const anyVis = members.some(l => l.visible);
+  members.forEach(l => { if (anyVis ? l.visible : !l.visible) toggleLayer(l.id); });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1583,13 +1643,16 @@ async function loadStereo70Zip(url) {
     const allFeatures = arr.flatMap(fc => fc.features || []);
     addLayer({
       id: 'static_orange_aerian',
-      name: 'Orange Aerian',
+      name: 'Aerian',
       cat: 'utilitati',
       color: '#ff6d00',
       format: 'SHP',
       geojson: { type:'FeatureCollection', features: allFeatures },
       visible: false,
-      static: true
+      static: true,
+      group: 'orange',
+      groupLabel: 'ORANGE',
+      groupColor: '#ff6d00'
     });
   } catch(e) { console.error('Eroare Orange Aerian', e); }
 })();
@@ -1605,13 +1668,16 @@ async function loadStereo70Zip(url) {
     const allFeatures = arr.flatMap(fc => fc.features || []);
     addLayer({
       id: 'static_orange_subteran',
-      name: 'Orange Subteran',
+      name: 'Subteran',
       cat: 'utilitati',
       color: '#e65100',
       format: 'SHP',
       geojson: { type:'FeatureCollection', features: allFeatures },
       visible: false,
-      static: true
+      static: true,
+      group: 'orange',
+      groupLabel: 'ORANGE',
+      groupColor: '#ff6d00'
     });
   } catch(e) { console.error('Eroare Orange Subteran', e); }
 })();
