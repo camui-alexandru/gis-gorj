@@ -1444,6 +1444,7 @@ async function refreshFgbLayers() {
   const b = map.getBounds();
   const rect = { minX: b.getWest(), minY: b.getSouth(), maxX: b.getEast(), maxY: b.getNorth() };
 
+  const tasks = [];
   for (const id in FGB_LAYERS) {
     const l = FGB_LAYERS[id];
     if (!l.visible) continue;
@@ -1452,17 +1453,19 @@ async function refreshFgbLayers() {
       l.leafletLayer.clearLayers(); l.geojson.features = [];
       continue;
     }
-    try {
-      const resp = await fetch(l.fgbUrl);
-      const features = [];
-      for await (const f of flatgeobuf.deserialize(resp.body, rect)) {
-        features.push(f);
-      }
-      l.geojson.features = features;
-      l.leafletLayer.clearLayers();
-      l.leafletLayer.addData({ type:'FeatureCollection', features });
-    } catch(e) { console.error('FGB load error', id, e); }
+    tasks.push((async () => {
+      try {
+        const features = [];
+        for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) {
+          features.push(f);
+        }
+        l.geojson.features = features;
+        l.leafletLayer.clearLayers();
+        l.leafletLayer.addData({ type:'FeatureCollection', features });
+      } catch(e) { console.error('FGB load error', l.id, e); }
+    })());
   }
+  await Promise.all(tasks);
   scheduleLabels();
 }
 
