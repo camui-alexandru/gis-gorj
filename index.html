@@ -497,6 +497,7 @@ const CATEGORIES = [
   { id:'utilitati', icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
   { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
+  { id:'proiecte',  icon:'📐', label:'Proiecte',                 color:'#ff7043' },
   { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
 
@@ -1503,6 +1504,10 @@ async function loadStaticLayers() {
 
   // ── Urbanism ──
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6', 'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
+
+  // ── Proiecte ──
+  createFgbLayer('static_vo_balesti',  'VO Bălești',   '#ff7043', 'DATA/VO_Balesti.fgb',  { cat:'proiecte', minZoom:9 });
+  createFgbLayer('static_drum_expres', 'Drum Expres',  '#42a5f5', 'DATA/Drum_expres.fgb', { cat:'proiecte', minZoom:9 });
 
   map.on('moveend zoomend', scheduleFgbRefresh);
   loadCadSearchIndex();
