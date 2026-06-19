@@ -129,9 +129,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .form-row label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
 .form-row input[type=text],.form-row select{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:7px 10px;color:var(--text);font-size:13px;outline:none}
 .form-row input[type=text]:focus,.form-row select:focus{border-color:var(--accent)}
-.presets{display:flex;flex-wrap:wrap;gap:5px}
-.preset-btn{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--muted);padding:5px 10px;font-size:11px;cursor:pointer;transition:.15s}
-.preset-btn.active,.preset-btn:hover{border-color:var(--accent);color:var(--text);background:var(--panel2)}
 .color-row{flex-direction:row!important;align-items:center}
 .color-row label{flex:1}
 .color-row input[type=color]{width:30px;height:30px;border:none;border-radius:5px;cursor:pointer;background:none;padding:0}
@@ -427,26 +424,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
       </div>
 
       <div class="form-row">
-        <label>Categorie</label>
-        <select id="catSelect">
-          <option value="cadastru">📍 Cadastru</option>
-          <option value="urbanism">🏘 Urbanism (PUG/PUZ/PUD)</option>
-          <option value="drumuri">🛣 Drumuri</option>
-          <option value="utilitati" selected>⚡ Rețele Utilități</option>
-          <option value="transport">🔵 Rețele Transport</option>
-          <option value="mediu">🌿 Mediu &amp; Arii protejate</option>
-          <option value="altele">📋 Altele</option>
-        </select>
-      </div>
-
-      <div class="form-row">
         <label>Nume strat</label>
         <input type="text" id="layerNameInput" placeholder="ex: Parcele cadastrale sector 1"/>
-      </div>
-
-      <div class="form-row">
-        <label>Tip rețea / preset culoare</label>
-        <div class="presets" id="presets"></div>
       </div>
 
       <div class="form-row color-row">
@@ -521,21 +500,6 @@ const CATEGORIES = [
   { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
 
-const PRESETS = [
-  { label:'Apă',          color:'#2196f3', cat:'utilitati' },
-  { label:'Canalizare',   color:'#795548', cat:'utilitati' },
-  { label:'Gaz',          color:'#ff9800', cat:'utilitati' },
-  { label:'Electricitate',color:'#ffeb3b', cat:'utilitati' },
-  { label:'Telecom',      color:'#9c27b0', cat:'utilitati' },
-  { label:'Termoficare',  color:'#f44336', cat:'utilitati' },
-  { label:'Parcele',      color:'#e8a838', cat:'cadastru'  },
-  { label:'Imobile',      color:'#f39c12', cat:'cadastru'  },
-  { label:'PUG',          color:'#8e44ad', cat:'urbanism'  },
-  { label:'PUZ',          color:'#6c3483', cat:'urbanism'  },
-  { label:'Drum naț.',    color:'#e74c3c', cat:'drumuri'   },
-  { label:'Drum jud.',    color:'#e67e22', cat:'drumuri'   },
-  { label:'Drum com.',    color:'#f1c40f', cat:'drumuri'   },
-];
 
 const CAT_STATE = {}; // { catId: { open: bool } }
 CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
@@ -1129,7 +1093,7 @@ function closeMobileSidebar() {
 // ═══════════════════════════════════════════════════════════════════
 // UPLOAD MODAL
 // ═══════════════════════════════════════════════════════════════════
-function openUpload()  { document.getElementById('modal').classList.remove('hidden'); renderPresets(); }
+function openUpload()  { document.getElementById('modal').classList.remove('hidden'); }
 function closeUpload() {
   document.getElementById('modal').classList.add('hidden');
   selectedFile = null; selectedFiles = {};
@@ -1141,7 +1105,6 @@ function closeUpload() {
   document.getElementById('errMsg').style.display = 'none';
   document.getElementById('progressBar').style.display = 'none';
   document.getElementById('btnOk').disabled = true;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
 }
 function handleOverlayClick(e) { if (e.target === e.currentTarget) closeUpload(); }
 function handleDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
@@ -1212,7 +1175,7 @@ async function submitUpload() {
 
   const name  = document.getElementById('layerNameInput').value || 'Strat nou';
   const color = document.getElementById('colorInput').value;
-  const cat   = document.getElementById('catSelect').value;
+  const cat   = 'altele';
   const crs   = document.getElementById('crsSelect').value;
 
   try {
@@ -1240,26 +1203,6 @@ async function submitUpload() {
 
 function setProgress(p) { document.getElementById('progressFill').style.width = p + '%'; }
 
-function renderPresets() {
-  const cat = document.getElementById('catSelect').value;
-  const container = document.getElementById('presets');
-  const list = PRESETS.filter(p => p.cat === cat || cat === 'altele');
-  container.innerHTML = '';
-  list.forEach(p => {
-    const btn = document.createElement('button');
-    btn.className = 'preset-btn';
-    btn.type = 'button';
-    btn.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;vertical-align:middle"></span>${p.label}`;
-    btn.onclick = () => {
-      document.getElementById('colorInput').value = p.color;
-      document.getElementById('colorHex').textContent = p.color;
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    };
-    container.appendChild(btn);
-  });
-}
-document.getElementById('catSelect').addEventListener('change', renderPresets);
 
 // ═══════════════════════════════════════════════════════════════════
 // PARSERS
