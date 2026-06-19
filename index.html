@@ -1683,6 +1683,43 @@ async function loadStereo70Zip(url) {
   } catch(e) { console.error('Eroare ANCOM', e); }
 })();
 
+// ── Straturi statice APAREGIO (Apă + Canal) ─────────────────────────
+(async function() {
+  try {
+    const fc = await loadStereo70Zip('DATA/APAREGIO_APA.zip');
+    addLayer({
+      id: 'static_aparegio_apa',
+      name: 'Apă',
+      cat: 'utilitati',
+      color: '#2196f3',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true,
+      group: 'aparegio',
+      groupLabel: 'APAREGIO',
+      groupColor: '#2196f3'
+    });
+  } catch(e) { console.error('Eroare APAREGIO Apă', e); }
+
+  try {
+    const fc = await loadStereo70Zip('DATA/APAREGIO_CANAL.zip');
+    addLayer({
+      id: 'static_aparegio_canal',
+      name: 'Canal',
+      cat: 'utilitati',
+      color: '#8d6e63',
+      format: 'SHP',
+      geojson: fc,
+      visible: false,
+      static: true,
+      group: 'aparegio',
+      groupLabel: 'APAREGIO',
+      groupColor: '#2196f3'
+    });
+  } catch(e) { console.error('Eroare APAREGIO Canal', e); }
+})();
+
 // ── Strat static Căi Ferate ─────────────────────────────────────────
 (async function() {
   try {
