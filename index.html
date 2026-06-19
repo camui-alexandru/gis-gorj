@@ -1708,13 +1708,14 @@ const ArcGISDynamic = L.Layer.extend({
 
         // Construiește panoul de atribute
         const utrAfisare = attrs['UTR_afisare'] || attrs['utr_afisare'] || '';
-        const utrPug = attrs['utr_pug'] || attrs['UTR_PUG'] || '';
+        const utrPug = attrs['utr_pug'] || attrs['UTR_PUG'] || attrs['utr_puz'] || attrs['UTR_PUZ'] || attrs['den_regulament'] || '';
         const tip = attrs['tip'] || attrs['TIP'] || '';
         const obs = attrs['obs'] || attrs['OBS'] || '';
         const utr = attrs['utr'] || attrs['UTR'] || '';
+        const isPuz = r.layerId === 2;
 
         document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
-        document.getElementById('attrLayerName').textContent = utrAfisare || r.layerName || (r.layerId === 2 ? 'PUZ' : 'PUG');
+        document.getElementById('attrLayerName').textContent = utrAfisare || r.layerName || (isPuz ? 'PUZ' : 'PUG');
         document.getElementById('attrGeomType').textContent = utr || 'Zonă funcțională';
 
         const entries = Object.entries(attrs).filter(([,v]) =>
@@ -1724,7 +1725,7 @@ const ArcGISDynamic = L.Layer.extend({
             '<tr><td>' + k + '</td><td>' + String(v) + '</td></tr>').join('') + '</tbody></table>';
 
         if (utrPug) {
-          html += '<button onclick="loadRegimTehnic(\'' + utrPug + '\')" style="' +
+          html += '<button onclick="loadRegimTehnic(\'' + utrPug + '\',' + (r.layerId || 0) + ')" style="' +
             'width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;' +
             'border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;' +
             'transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px' +
@@ -1741,9 +1742,9 @@ const ArcGISDynamic = L.Layer.extend({
   });
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
-  window.loadRegimTehnic = function(utrPug) {
+  window.loadRegimTehnic = function(utrPug, idStrat) {
     const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
-      '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
+      '?msg=&idStrat=' + (idStrat || 0) + '&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
