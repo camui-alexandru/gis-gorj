@@ -1637,6 +1637,26 @@ const ArcGISDynamic = L.Layer.extend({
     _isTile: true,
     leafletLayer: zpDyn,
   });
+
+  // PUZ — MapServer layer 2
+  const puzDyn = new ArcGISDynamic(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    { opacity: 0.85, attribution: '© CJ Gorj',
+      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
+      layers: 2 }
+  );
+  layers.push({
+    id: 'static_puz',
+    name: 'PUZ',
+    cat: 'urbanism',
+    color: '#6c3483',
+    format: 'WMS',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isTile: true,
+    leafletLayer: puzDyn,
+  });
   renderTree();
 
   // Geometria selectată pe hartă
