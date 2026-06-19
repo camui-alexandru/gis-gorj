@@ -1708,7 +1708,10 @@ const ArcGISDynamic = L.Layer.extend({
 
         // Construiește panoul de atribute
         const utrAfisare = attrs['UTR_afisare'] || attrs['utr_afisare'] || '';
-        const utrPug = attrs['utr_pug'] || attrs['UTR_PUG'] || attrs['utr_puz'] || attrs['UTR_PUZ'] || attrs['den_regulament'] || '';
+        const _notNull = v => v && v !== 'Null' && v !== 'null' ? v : '';
+        const utrPug = _notNull(attrs['den_regulament']) || _notNull(attrs['DEN_REGULAMENT'])
+          || _notNull(attrs['utr_pug']) || _notNull(attrs['UTR_PUG'])
+          || _notNull(attrs['utr_puz']) || _notNull(attrs['UTR_PUZ']) || '';
         const tip = attrs['tip'] || attrs['TIP'] || '';
         const obs = attrs['obs'] || attrs['OBS'] || '';
         const utr = attrs['utr'] || attrs['UTR'] || '';
@@ -1725,7 +1728,7 @@ const ArcGISDynamic = L.Layer.extend({
             '<tr><td>' + k + '</td><td>' + String(v) + '</td></tr>').join('') + '</tbody></table>';
 
         if (utrPug) {
-          html += '<button onclick="loadRegimTehnic(\'' + utrPug + '\',' + (r.layerId || 0) + ')" style="' +
+          html += '<button onclick="loadRegimTehnic(\'' + utrPug + '\')" style="' +
             'width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;' +
             'border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;' +
             'transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px' +
@@ -1742,9 +1745,9 @@ const ArcGISDynamic = L.Layer.extend({
   });
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
-  window.loadRegimTehnic = function(utrPug, idStrat) {
+  window.loadRegimTehnic = function(utrPug) {
     const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
-      '?msg=&idStrat=' + (idStrat || 0) + '&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
+      '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
