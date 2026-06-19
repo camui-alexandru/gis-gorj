@@ -729,9 +729,9 @@ function buildLeafletLayer(layer) {
   const ptLayer = (f, ll) => L.circleMarker(ll, { radius:6, color:layer.color, fillColor:layer.color, fillOpacity:.75, weight:2 });
 
   const onEach = (f, lyr) => {
-    lyr.on('click', e => { L.DomEvent.stopPropagation(e); if (activeTool === 'pan') showAttr(f, layer); });
-    lyr.on('mouseover', function() { this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 }); });
-    lyr.on('mouseout',  function() { this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 }); });
+    lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, layer); });
+    lyr.on('mouseover', function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 }); });
+    lyr.on('mouseout',  function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 }); });
   };
 
   const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach });
@@ -1406,9 +1406,9 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
   opts = opts || {};
   const style = () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
   const onEach = (f, lyr) => {
-    lyr.on('click', e => { L.DomEvent.stopPropagation(e); if (activeTool === 'pan') showAttr(f, FGB_LAYERS[id]); });
-    lyr.on('mouseover', function() { this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 }); });
-    lyr.on('mouseout',  function() { this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 }); });
+    lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
+    lyr.on('mouseover', function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 }); });
+    lyr.on('mouseout',  function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 }); });
   };
 
   const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach });
