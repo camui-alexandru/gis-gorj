@@ -1673,52 +1673,18 @@ const ArcGISDynamic = L.Layer.extend({
     }
   });
 
-  // Încarcă regimul tehnic de la CJ Gorj
-  window.loadRegimTehnic = async function(utrPug) {
+  // Încarcă regimul tehnic de la CJ Gorj (iframe — cookie-uri gis.cjgorj.ro trimise automat)
+  window.loadRegimTehnic = function(utrPug) {
     const container = document.getElementById('regimTehnicContent');
     if (!container) return;
-    container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted)">Se încarcă regimul tehnic...</div>';
-
     const url = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
       '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
-    try {
-      const resp = await fetch('https://gis.cjgorj.ro/proxy/proxy.ashx?' + url);
-      const text = await resp.text();
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, 'text/html');
-
-      const tables = doc.querySelectorAll('table');
-      if (tables.length > 0) {
-        let html = '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
-          '<div style="font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:8px">Regim Tehnic</div>';
-        tables.forEach(tbl => {
-          html += '<table class="attr-tbl" style="margin-bottom:8px"><tbody>';
-          tbl.querySelectorAll('tr').forEach(tr => {
-            const cells = tr.querySelectorAll('td, th');
-            if (cells.length >= 2) {
-              html += '<tr><td>' + (cells[0].textContent || '').trim() +
-                '</td><td>' + (cells[1].textContent || '').trim() + '</td></tr>';
-            } else if (cells.length === 1) {
-              html += '<tr><td colspan="2" style="font-weight:600;color:var(--accent)">' +
-                (cells[0].textContent || '').trim() + '</td></tr>';
-            }
-          });
-          html += '</tbody></table>';
-        });
-        html += '</div>';
-        container.innerHTML = html;
-      } else {
-        const bodyText = doc.body ? doc.body.innerHTML : text;
-        container.innerHTML = '<div style="margin-top:8px;border-top:1px solid var(--border);' +
-          'padding-top:8px;font-size:12px;line-height:1.6;color:var(--text)">' +
-          '<div style="font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:8px">Regim Tehnic</div>' +
-          bodyText + '</div>';
-      }
-    } catch(err) {
-      console.warn('Regim tehnic error:', err);
-      container.innerHTML = '<div style="padding:8px;color:var(--red);font-size:12px">Nu s-a putut încărca regimul tehnic.</div>';
-    }
+    container.innerHTML =
+      '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
+        '<div style="font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:6px">Regim Tehnic</div>' +
+        '<iframe src="' + url + '" style="width:100%;min-height:400px;border:1px solid var(--border);' +
+          'border-radius:6px;background:#fff"></iframe>' +
+      '</div>';
   };
 
   // Curăță selecția când se închide panoul de atribute
