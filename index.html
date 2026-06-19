@@ -1767,7 +1767,8 @@ async function loadStereo70Zip(url) {
   const pugDyn = new ArcGISDynamic(
     'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
     { opacity: 0.85, attribution: '© CJ Gorj',
-      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?' }
+      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
+      layers: 0 }
   );
   const pugLayer = {
     id: 'static_pug',
@@ -1782,6 +1783,26 @@ async function loadStereo70Zip(url) {
     leafletLayer: pugDyn,
   };
   layers.push(pugLayer);
+
+  // Zone Protecție — MapServer layer 1
+  const zpDyn = new ArcGISDynamic(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    { opacity: 0.85, attribution: '© CJ Gorj',
+      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
+      layers: 1 }
+  );
+  layers.push({
+    id: 'static_zone_protectie',
+    name: 'Zone Protecție',
+    cat: 'urbanism',
+    color: '#795548',
+    format: 'WMS',
+    geojson: { type:'FeatureCollection', features:[] },
+    visible: false,
+    static: true,
+    _isTile: true,
+    leafletLayer: zpDyn,
+  });
   renderTree();
 
   // Geometria selectată pe hartă
