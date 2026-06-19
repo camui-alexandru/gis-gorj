@@ -63,6 +63,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .layer-row:hover .layer-actions{opacity:1}
 .la-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:3px}
 .la-btn:hover{color:var(--text);background:var(--border)}
+.layer-opacity{display:flex;align-items:center;gap:6px;padding:2px 10px 5px 28px;border-bottom:1px solid #0d1828}
+.layer-opacity input[type=range]{flex:1;height:4px;-webkit-appearance:none;appearance:none;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+.layer-opacity input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer}
+.layer-opacity input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
+.layer-opacity span{font-size:10px;color:var(--muted);min-width:28px;text-align:right}
 .badge{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;color:#fff;flex-shrink:0}
 .sb-empty{padding:20px 12px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center}
 .sb-footer{border-top:1px solid var(--border);padding:8px 10px;display:flex;gap:6px}
@@ -864,6 +869,10 @@ function renderTree() {
               ${l.static ? '' : `<button class="la-btn" onclick="removeLayer('${l.id}')" title="Șterge">✕</button>`}
             </div>
           </div>
+          ${l.visible ? `<div class="layer-opacity">
+            <input type="range" min="0" max="100" value="${Math.round((l._opacity ?? 1) * 100)}" oninput="setLayerOpacity('${l.id}', this.value / 100, this)"/>
+            <span>${Math.round((l._opacity ?? 1) * 100)}%</span>
+          </div>` : ''}
         `).join('')}
       </div>
     </div>`;
@@ -872,6 +881,20 @@ function renderTree() {
   document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'uri' : ''}`;
   document.getElementById('featureCountBar').querySelector('span').textContent =
     layers.reduce((s, l) => s + l.geojson.features.length, 0) + ' entități totale';
+}
+
+function setLayerOpacity(id, opacity, slider) {
+  const layer = layers.find(l => l.id === id) || FGB_LAYERS[id];
+  if (!layer) return;
+  layer._opacity = opacity;
+  if (layer.leafletLayer) {
+    if (typeof layer.leafletLayer.setOpacity === 'function') {
+      layer.leafletLayer.setOpacity(opacity);
+    } else if (typeof layer.leafletLayer.setStyle === 'function') {
+      layer.leafletLayer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.3 });
+    }
+  }
+  if (slider) slider.nextElementSibling.textContent = Math.round(opacity * 100) + '%';
 }
 
 function toggleCat(id) {
