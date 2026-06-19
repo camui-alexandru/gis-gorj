@@ -493,6 +493,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
 <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // STATE
@@ -1512,22 +1513,42 @@ const ArcGISDynamic = L.Layer.extend({
   } catch(e) { console.error('Eroare Transgaz', e); }
 })();
 
+// Helper: parsează SHP zip fără reproiecție automată, apoi reproiectează cu Stereo70 corect
+async function loadStereo70Zip(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('Fetch failed');
+  const buf = await resp.arrayBuffer();
+  const zip = await JSZip.loadAsync(buf);
+  let shpBuf = null, dbfBuf = null;
+  for (const name of Object.keys(zip.files)) {
+    const ext = name.split('.').pop().toLowerCase();
+    if (ext === 'shp') shpBuf = await zip.files[name].async('arraybuffer');
+    if (ext === 'dbf') dbfBuf = await zip.files[name].async('arraybuffer');
+  }
+  if (!shpBuf) throw new Error('No .shp in zip');
+  const geoms = await shp.parseShp(shpBuf);
+  let features;
+  if (dbfBuf) {
+    const attrs = await shp.parseDbf(dbfBuf);
+    features = geoms.map((g, i) => ({ type:'Feature', geometry:g, properties:attrs[i]||{} }));
+  } else {
+    features = geoms.map(g => ({ type:'Feature', geometry:g, properties:{} }));
+  }
+  const fc = { type:'FeatureCollection', features };
+  return await reprojectAsync(fc, 'EPSG:31700');
+}
+
 // ── Strat static TRANSELECTRICA ─────────────────────────────────────
 (async function() {
   try {
-    const resp = await fetch('DATA/TRANSELECTRICA.zip');
-    if (!resp.ok) return;
-    const buf = await resp.arrayBuffer();
-    const results = await shp(buf);
-    const arr = Array.isArray(results) ? results : [results];
-    const allFeatures = arr.flatMap(fc => fc.features || []);
+    const fc = await loadStereo70Zip('DATA/TRANSELECTRICA.zip');
     addLayer({
       id: 'static_transelectrica',
       name: 'TRANSELECTRICA',
       cat: 'transport',
       color: '#e74c3c',
       format: 'SHP',
-      geojson: { type:'FeatureCollection', features: allFeatures },
+      geojson: fc,
       visible: false,
       static: true
     });
@@ -1537,19 +1558,14 @@ const ArcGISDynamic = L.Layer.extend({
 // ── Strat static ROMGAZ ─────────────────────────────────────────────
 (async function() {
   try {
-    const resp = await fetch('DATA/ROMGAZ.zip');
-    if (!resp.ok) return;
-    const buf = await resp.arrayBuffer();
-    const results = await shp(buf);
-    const arr = Array.isArray(results) ? results : [results];
-    const allFeatures = arr.flatMap(fc => fc.features || []);
+    const fc = await loadStereo70Zip('DATA/ROMGAZ.zip');
     addLayer({
       id: 'static_romgaz',
       name: 'ROMGAZ',
       cat: 'transport',
       color: '#3498db',
       format: 'SHP',
-      geojson: { type:'FeatureCollection', features: allFeatures },
+      geojson: fc,
       visible: false,
       static: true
     });
