@@ -1423,8 +1423,9 @@ const ArcGISDynamic = L.Layer.extend({
     const b = map.getBounds();
     const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
     const layersParam = this.options.layers != null ? `&layers=show:${this.options.layers}` : '';
-    const url = `${this._url}/export?bbox=${bbox}&bboxSR=4326${layersParam}`+
-      `&size=${size.x},${size.y}&imageSR=4326&format=png32&transparent=true&f=image`;
+    const exportUrl = `${this._url}/export?bbox=${bbox}&bboxSR=4326${layersParam}`+
+      `&size=${size.x},${size.y}&imageSR=4326&format=png32&transparent=true&dpi=96&f=image`;
+    const url = this.options.proxy ? this.options.proxy + encodeURIComponent(exportUrl) : exportUrl;
 
     const nw = map.latLngToLayerPoint(b.getNorthWest());
     const se = map.latLngToLayerPoint(b.getSouthEast());
@@ -1435,10 +1436,10 @@ const ArcGISDynamic = L.Layer.extend({
     L.DomUtil.setPosition(this._img, nw);
 
     const img = this._img;
-    const newSrc = url;
     img.onload = () => { img.style.opacity = this.options.opacity ?? 1; };
+    img.onerror = () => { console.warn('ArcGIS layer load error:', url.substring(0, 120)); };
     img.style.opacity = 0;
-    img.src = newSrc;
+    img.src = url;
   }
 });
 
@@ -1551,15 +1552,11 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat PUG (Plan Urbanistic General) — CJ Gorj ArcGIS ────────
 (function() {
-  const pugWms = L.tileLayer.wms(
-    'https://gis.cjgorj.ro/server/services/FIDA/PUG/MapServer/WMSServer',
-    { layers: '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20',
-      format: 'image/png', transparent: true, version: '1.1.1',
-      opacity: 0.85, attribution: '© CJ Gorj', maxZoom: 22 }
+  const pugDyn = new ArcGISDynamic(
+    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
+    { opacity: 0.85, attribution: '© CJ Gorj',
+      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?' }
   );
-  pugWms.on('tileerror', function(e) {
-    console.warn('PUG WMS tile error:', e.tile?.src);
-  });
   const pugLayer = {
     id: 'static_pug',
     name: 'PUG (Plan Urbanistic General)',
@@ -1570,7 +1567,7 @@ const ArcGISDynamic = L.Layer.extend({
     visible: false,
     static: true,
     _isTile: true,
-    leafletLayer: pugWms,
+    leafletLayer: pugDyn,
   };
   layers.push(pugLayer);
   renderTree();
