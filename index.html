@@ -232,6 +232,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   .coord-display{display:none}
   .basemap-select{font-size:11px;padding:4px 6px;max-width:120px}
   .btn-add{padding:6px 10px;font-size:11px}
+  #cadSearchBtn{display:none}
   .tool-btn{padding:6px 8px;font-size:12px}
 
   /* Sidebar ca drawer overlay */
@@ -339,7 +340,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
       <option value="dark">🌑 Dark</option>
       <option value="none">☐ Fără fond</option>
     </select>
-    <button class="tool-btn" onclick="openCadSearch()" title="Caută număr cadastral">🔎 Căutare cadastrală</button>
+    <button class="tool-btn" id="cadSearchBtn" onclick="openCadSearch()" title="Caută număr cadastral">🔎 Căutare cadastrală</button>
     <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
     <div class="coord-display" id="coordDisplay">—</div>
   </div>
