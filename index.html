@@ -1393,7 +1393,11 @@ async function loadCadSearchIndex() {
     const lines = text.split('\n');
     for (let i = 1; i < lines.length; i++) {
       const [nc, au, lon, lat] = lines[i].split(',');
-      if (nc && lon && lat) idx[nc.trim()] = { lon: +lon, lat: +lat, admin_unit: +(au||0) };
+      if (nc && lon && lat) {
+        const key = nc.trim();
+        if (!idx[key]) idx[key] = [];
+        idx[key].push({ lon: +lon, lat: +lat, admin_unit: +(au||0) });
+      }
     }
     cadSearchIndex = idx;
     showStaticLoadMsg('');
@@ -1988,14 +1992,18 @@ function runCadSearch() {
     const nrNorm = nrRaw.replace(/^0+/,'').toLowerCase();
     const results = [];
 
-    for (const [nc, entry] of Object.entries(cadSearchIndex)) {
+    for (const [nc, entries] of Object.entries(cadSearchIndex)) {
       const ncNorm = nc.replace(/^0+/,'').toLowerCase();
       const nrOk = !nrRaw || ncNorm === nrNorm || ncNorm.includes(nrNorm);
-      const uatOk = !sirutaCodes || sirutaCodes.has(String(Math.round(entry.admin_unit)));
-      if (nrOk && uatOk) {
-        results.push({ nc, entry });
-        if (results.length >= 50) break;
+      if (!nrOk) continue;
+      for (const entry of entries) {
+        const uatOk = !sirutaCodes || sirutaCodes.has(String(Math.round(entry.admin_unit)));
+        if (uatOk) {
+          results.push({ nc, entry });
+          if (results.length >= 50) break;
+        }
       }
+      if (results.length >= 50) break;
     }
 
     if (results.length === 0) {
