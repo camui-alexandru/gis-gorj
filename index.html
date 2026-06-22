@@ -1841,9 +1841,12 @@ const ArcGISDynamic = L.Layer.extend({
       w.document.close();
     }
 
-    fetch(xmlUrl).then(function(r){if(!r.ok)throw r;return r.text();})
-      .catch(function(){return fetch(xmlUrl,{credentials:'include'}).then(function(r){if(!r.ok)throw r;return r.text();});})
-      .then(function(raw){openStyled(extractText(raw));})
+    var proxyUrl = 'https://gis.cjgorj.ro/proxy/proxy.ashx?' + xmlUrl;
+    fetch(proxyUrl).then(function(r){if(!r.ok)throw r;return r.text();})
+      .then(function(raw){
+        if (!raw || raw.trim().toLowerCase() === 'null' || raw.trim().length < 10) { openFallback(); return; }
+        openStyled(extractText(raw));
+      })
       .catch(function(){openFallback();});
   };
 
