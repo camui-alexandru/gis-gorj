@@ -1715,7 +1715,7 @@ const ArcGISDynamic = L.Layer.extend({
 
         // Construiește panoul de atribute
         const utrAfisare = attrs['UTR_afisare'] || attrs['utr_afisare'] || '';
-        const _notNull = v => v && v !== 'Null' && v !== 'null' ? v : '';
+        const _notNull = v => v && String(v).toLowerCase() !== 'null' ? v : '';
         const utrPug = _notNull(attrs['den_regulament']) || _notNull(attrs['DEN_REGULAMENT'])
           || _notNull(attrs['utr_pug']) || _notNull(attrs['UTR_PUG'])
           || _notNull(attrs['utr_puz']) || _notNull(attrs['UTR_PUZ']) || '';
