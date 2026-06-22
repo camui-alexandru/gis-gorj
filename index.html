@@ -1754,8 +1754,7 @@ const ArcGISDynamic = L.Layer.extend({
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
   window.loadRegimTehnic = function(utrPug) {
-    const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
-      '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
+    const xmlUrl = 'https://gis.cjgorj.ro/urbanism/PUG_ZONE_INFO.jsp?zona=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
