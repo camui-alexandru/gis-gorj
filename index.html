@@ -1754,7 +1754,8 @@ const ArcGISDynamic = L.Layer.extend({
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
   window.loadRegimTehnic = function(utrPug) {
-    const xmlUrl = 'https://gis.cjgorj.ro/urbanism/PUG_ZONE_INFO.jsp?zona=' + encodeURIComponent(utrPug);
+    const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
+      '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
@@ -1840,13 +1841,7 @@ const ArcGISDynamic = L.Layer.extend({
       w.document.close();
     }
 
-    var proxyUrl = 'https://gis.cjgorj.ro/proxy/proxy.ashx?' + xmlUrl;
-    fetch(proxyUrl).then(function(r){if(!r.ok)throw r;return r.text();})
-      .then(function(raw){
-        if (!raw || raw.trim().toLowerCase() === 'null' || raw.trim().length < 10) { openFallback(); return; }
-        openStyled(extractText(raw));
-      })
-      .catch(function(){openFallback();});
+    openFallback();
   };
 
   // Curăță selecția când se închide panoul de atribute
