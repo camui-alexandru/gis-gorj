@@ -1713,15 +1713,13 @@ const ArcGISDynamic = L.Layer.extend({
           }
         }
 
-        // Construiește panoul de atribute
-        const utrAfisare = attrs['UTR_afisare'] || attrs['utr_afisare'] || '';
-        const _notNull = v => v && String(v).toLowerCase() !== 'null' ? v : '';
-        const utrPug = _notNull(attrs['den_regulament']) || _notNull(attrs['DEN_REGULAMENT'])
-          || _notNull(attrs['utr_pug']) || _notNull(attrs['UTR_PUG'])
-          || _notNull(attrs['utr_puz']) || _notNull(attrs['UTR_PUZ']) || '';
-        const tip = attrs['tip'] || attrs['TIP'] || '';
-        const obs = attrs['obs'] || attrs['OBS'] || '';
-        const utr = attrs['utr'] || attrs['UTR'] || '';
+        // Construiește panoul de atribute — lookup case-insensitive
+        const _attr = name => { const lc = name.toLowerCase(); for (const k in attrs) { if (k.toLowerCase() === lc) { const v = attrs[k]; return (v && String(v).toLowerCase() !== 'null') ? String(v) : ''; } } return ''; };
+        const utrAfisare = _attr('utr_afisare');
+        const utrPug = _attr('utr_pug') || _attr('den_regulament');
+        const tip = _attr('tip');
+        const obs = _attr('obs');
+        const utr = _attr('utr');
         const isPuz = r.layerId === 2;
 
         document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
