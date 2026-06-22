@@ -1841,7 +1841,7 @@ const ArcGISDynamic = L.Layer.extend({
       w.document.close();
     }
 
-    openFallback();
+    window.open(xmlUrl, '_blank');
   };
 
   // Curăță selecția când se închide panoul de atribute
