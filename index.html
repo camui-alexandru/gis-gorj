@@ -1701,6 +1701,8 @@ const ArcGISDynamic = L.Layer.extend({
       if (data.results && data.results.length > 0) {
         const r = data.results[0];
         const attrs = r.attributes || {};
+        console.log('PUG/PUZ identify — layerId:', r.layerId, 'layerName:', r.layerName);
+        console.log('PUG/PUZ identify — attrs:', JSON.stringify(attrs));
 
         // Desenează geometria selectată
         if (r.geometry) {
@@ -1717,6 +1719,7 @@ const ArcGISDynamic = L.Layer.extend({
         const _attr = name => { const lc = name.toLowerCase(); for (const k in attrs) { if (k.toLowerCase() === lc) { const v = attrs[k]; return (v && String(v).toLowerCase() !== 'null') ? String(v) : ''; } } return ''; };
         const utrAfisare = _attr('utr_afisare');
         const utrPug = _attr('utr_pug') || _attr('den_regulament');
+        console.log('PUG/PUZ identify — utrPug:', utrPug);
         const tip = _attr('tip');
         const obs = _attr('obs');
         const utr = _attr('utr');
