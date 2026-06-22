@@ -1856,11 +1856,11 @@ const ArcGISDynamic = L.Layer.extend({
       '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
       '<div class="bd"><p style="color:#94a3b8">Se încarcă regulamentul…</p></div></body></html>');
 
-    fetch('https://gis.cjgorj.ro/proxy/proxy.ashx?' + xmlUrl)
+    fetch(xmlUrl)
       .then(function(r) { return r.text(); })
       .then(function(raw) {
         var text = extractText(raw);
-        if (!text || text.trim().length < 20) { openFallback(w); return; }
+        if (!text || text.trim().length < 20) { w.location.href = xmlUrl; return; }
         w.document.open();
         w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
           label + '</title><style>' + CSS + '</style></head><body>' +
@@ -1868,7 +1868,7 @@ const ArcGISDynamic = L.Layer.extend({
           '<div class="bd">' + buildHTML(text) + '</div></body></html>');
         w.document.close();
       })
-      .catch(function() { openFallback(w); });
+      .catch(function() { w.location.href = xmlUrl; });
   };
 
   // Curăță selecția când se închide panoul de atribute
