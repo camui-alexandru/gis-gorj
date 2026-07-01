@@ -1588,7 +1588,7 @@ const ArcGISDynamic = L.Layer.extend({
 (function() {
   const deoTile = new ArcGISDynamic(
     'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
-    { opacity: 1, attribution: '© Distribuție Oltenia' }
+    { opacity: 1, attribution: '© Distribuție Oltenia', layers: -1 }
   );
   const deoLayer = {
     id: 'static_deo',
