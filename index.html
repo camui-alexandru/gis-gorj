@@ -878,13 +878,16 @@ function renderTree() {
   let total = 0;
 
   function layerRowHTML(l) {
+    const errorBadge = l._serviceError
+      ? `<span class="badge" style="background:#e74c3c;cursor:default" title="Serviciu indisponibil (acces restricționat)">⚠ 403</span>`
+      : `<span class="badge" style="background:${l.format==='SHP'?'#1a8a6a':l.format==='DXF'?'#8a6a1a':'#3a5a8a'}">${l.format}</span>`;
     return `<div class="layer-row" id="lr_${l.id}">
       <span class="layer-vis ${l.visible ? 'on' : ''}" onclick="toggleLayer('${l.id}')" title="${l.visible ? 'Ascunde' : 'Arată'}">
         ${l.visible ? '👁' : '○'}
       </span>
       <span class="layer-color-dot" style="background:${l.color}" onclick="openColorPopup('${l.id}', event)" title="Schimbă culoare"></span>
       <span class="layer-label" title="${l.name}">${l.name}</span>
-      <span class="badge" style="background:${l.format==='SHP'?'#1a8a6a':l.format==='DXF'?'#8a6a1a':'#3a5a8a'}">${l.format}</span>
+      ${errorBadge}
       <div class="layer-actions">
         ${l._isTile ? '' : `<button class="la-btn" onclick="zoomToLayer('${l.id}')" title="Zoom la strat">⛶</button>`}
         ${l.static ? '' : `<button class="la-btn" onclick="removeLayer('${l.id}')" title="Șterge">✕</button>`}
@@ -1569,7 +1572,10 @@ const ArcGISDynamic = L.Layer.extend({
 
     const img = this._img;
     img.onload = () => { img.style.opacity = this.options.opacity ?? 1; };
-    img.onerror = () => { console.warn('ArcGIS layer load error:', url.substring(0, 120)); };
+    img.onerror = () => {
+      console.warn('ArcGIS layer load error:', url.substring(0, 120));
+      this.fire('loaderror');
+    };
     img.style.opacity = 0;
     img.src = url;
   }
@@ -1580,10 +1586,10 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Strat static DEO (Distribuție Oltenia) ──────────────────────────
 (function() {
-  const deoTile = L.esri.dynamicMapLayer({
-    url: 'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
-    opacity: 1, attribution: '© Distribuție Oltenia', f: 'image'
-  });
+  const deoTile = new ArcGISDynamic(
+    'https://gis.distributieoltenia.ro/services/rest/services/DEO/DEO_Productie/MapServer',
+    { opacity: 1, attribution: '© Distribuție Oltenia' }
+  );
   const deoLayer = {
     id: 'static_deo',
     name: 'Rețea DEO',
@@ -1596,6 +1602,12 @@ const ArcGISDynamic = L.Layer.extend({
     _isTile: true,
     leafletLayer: deoTile,
   };
+  deoTile.on('loaderror', () => {
+    if (!deoLayer._serviceError) {
+      deoLayer._serviceError = true;
+      renderTree();
+    }
+  });
   layers.push(deoLayer);
   renderTree();
 })();
