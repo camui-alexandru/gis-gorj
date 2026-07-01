@@ -1550,8 +1550,18 @@ async function getFgbBuffer(url) {
   if (!resp.ok) throw new Error(`HTTP ${resp.status} la ${url}`);
   const buf = new Uint8Array(await resp.arrayBuffer());
   FGB_BUFFER_CACHE[url] = buf;
-  console.log(`FGB cached: ${url.split('/').pop()} (${(buf.byteLength/1024/1024).toFixed(1)} MB)`);
   return buf;
+}
+
+// Calculează envelope [minX,minY,maxX,maxY] pentru o geometrie GeoJSON
+function calcEnvelope(coords) {
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  function walk(c) {
+    if (typeof c[0]==='number') { if(c[0]<x0)x0=c[0]; if(c[0]>x1)x1=c[0]; if(c[1]<y0)y0=c[1]; if(c[1]>y1)y1=c[1]; }
+    else c.forEach(walk);
+  }
+  walk(coords);
+  return [x0,y0,x1,y1];
 }
 
 async function refreshFgbLayers() {
@@ -1572,9 +1582,24 @@ async function refreshFgbLayers() {
       try {
         const features = [];
         if (l._noIndex) {
-          // Fișiere fără index spațial: descărcăm complet o dată și filtrăm în memorie
-          const buf = await getFgbBuffer(l.fgbUrl);
-          for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
+          // Fișiere fără index spațial: descărcăm complet o dată, cache toate features cu envelope pre-calculat
+          if (!l._cachedFeatures) {
+            const buf = await getFgbBuffer(l.fgbUrl);
+            l._cachedFeatures = [];
+            for await (const f of flatgeobuf.deserialize(buf)) {
+              if (f.geometry?.coordinates) {
+                f._env = calcEnvelope(f.geometry.coordinates);
+              }
+              l._cachedFeatures.push(f);
+            }
+            console.log(`FGB ${l.id}: ${l._cachedFeatures.length} features cached`);
+          }
+          // Filtrare rapidă după bbox
+          const { minX, minY, maxX, maxY } = rect;
+          for (const f of l._cachedFeatures) {
+            const e = f._env;
+            if (e && e[0]<=maxX && e[2]>=minX && e[1]<=maxY && e[3]>=minY) features.push(f);
+          }
         } else {
           // Fișiere cu index spațial: streaming Range requests eficient
           for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
