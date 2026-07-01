@@ -1549,6 +1549,7 @@ async function getFgbBuffer(url) {
   if (!resp.ok) throw new Error(`HTTP ${resp.status} la ${url}`);
   const buf = new Uint8Array(await resp.arrayBuffer());
   FGB_BUFFER_CACHE[url] = buf;
+  console.log(`FGB cached: ${url.split('/').pop()} (${(buf.byteLength/1024/1024).toFixed(1)} MB)`);
   return buf;
 }
 
@@ -1569,17 +1570,13 @@ async function refreshFgbLayers() {
     tasks.push((async () => {
       try {
         const features = [];
-        // Fișierele externe (release assets) se descarcă integral o dată și se caches-uiesc
-        const useCache = l.fgbUrl.startsWith('http');
-        if (useCache) {
-          const buf = await getFgbBuffer(l.fgbUrl);
-          for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
-        } else {
-          for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
-        }
+        // Descărcăm tot fișierul o dată și deserializăm din buffer (evită probleme cu index spațial lipsă)
+        const buf = await getFgbBuffer(l.fgbUrl);
+        for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
         l.geojson.features = features;
         l.leafletLayer.clearLayers();
         l.leafletLayer.addData({ type:'FeatureCollection', features });
+        if (features.length) console.log(`FGB ${l.id}: ${features.length} features loaded`);
       } catch(e) { console.error('FGB load error', l.id, e); }
     })());
   }
