@@ -505,6 +505,54 @@ const CATEGORIES = [
 ];
 
 
+// Renderer PUG: culori autentice din gis.cjgorj.ro (câmp: "tip")
+const PUG_RENDERER = {
+  field: 'tip',
+  values: {
+    '-//-':       { fill:[255,190,190], outline:[0,0,0] },
+    'Alte UTR-uri':{ fill:[232,190,255], outline:[0,0,0] },
+    'UAT':        { fill:[0,0,0,0],    outline:[255,0,0] },
+    'V':          { fill:[70,176,0],   outline:[0,0,0] },
+    'TAI':        { fill:[255,255,190],outline:[0,0,0] },
+    'G2':         { fill:[168,56,0],   outline:[0,0,0] },
+    'Cca':        { fill:[190,255,232],outline:[0,0,0] },
+    'Ccf':        { fill:[169,0,230],  outline:[0,0,0] },
+    'Ccn':        { fill:[0,197,255],  outline:[0,0,0] },
+    'Ccr':        { fill:[197,0,255],  outline:[0,0,0] },
+    'C':          { fill:[230,0,0],    outline:[0,0,0] },
+    'DS':         { fill:[223,115,255],outline:[0,0,0] },
+    'Extravilan': { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'EX1':        { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'G1':         { fill:[168,56,0],   outline:[110,110,110] },
+    'IS':         { fill:[255,0,0],    outline:[0,0,0] },
+    'M1':         { fill:[0,169,230],  outline:[0,0,0] },
+    'M2':         { fill:[168,0,0],    outline:[110,110,110] },
+    'M':          { fill:[230,0,0],    outline:[0,0,0] },
+    'L1':         { fill:[255,255,0],  outline:[0,0,0] },
+    'L2':         { fill:[255,255,115],outline:[0,0,0] },
+    'A':          { fill:[0,92,230],   outline:[0,0,0] },
+    'I':          { fill:[115,115,0],  outline:[0,0,0] },
+  }
+};
+function rgbaToHex([r,g,b,a=255]) {
+  if (a === 0) return 'transparent';
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function rendererStyle(renderer, feature, hovered) {
+  const val = feature.properties?.[renderer.field];
+  const entry = renderer.values[val];
+  const fill   = entry ? rgbaToHex(entry.fill)    : '#cccccc';
+  const stroke = entry ? rgbaToHex(entry.outline) : '#000000';
+  const fillA  = entry ? (entry.fill[3] ?? 255) / 255 : 0.35;
+  return {
+    color:       stroke === 'transparent' ? 'transparent' : stroke,
+    weight:      hovered ? 2.5 : 1,
+    opacity:     stroke === 'transparent' ? 0 : 0.9,
+    fillColor:   fill,
+    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA),
+  };
+}
+
 const CAT_STATE = {}; // { catId: { open: bool } }
 CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
 const GROUP_STATE = {};
@@ -748,13 +796,24 @@ function getNationalC(props) {
 
 function buildLeafletLayer(layer) {
   const withLabels = hasNationalC(layer);
-  const style = () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
+  const rdr = layer._renderer || null;
+  const style = rdr
+    ? f => rendererStyle(rdr, f, false)
+    : () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
   const ptLayer = (f, ll) => L.circleMarker(ll, { radius:6, color:layer.color, fillColor:layer.color, fillOpacity:.75, weight:2 });
 
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, layer); });
-    lyr.on('mouseover', function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 }); });
-    lyr.on('mouseout',  function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 }); });
+    lyr.on('mouseover', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
+      else this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 });
+    });
+    lyr.on('mouseout', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
+      else this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 });
+    });
   };
 
   const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach });
@@ -1033,6 +1092,26 @@ function showAttr(feature, layer) {
   const props = feature.properties || {};
   const nationalC = getNationalC(props);
   const scroll = document.getElementById('attrScroll');
+
+  // Mod PUG: afișaj special cu regim tehnic
+  if (layer._isPug) {
+    const _a = name => { const lc = name.toLowerCase(); for (const k in props) { if (k.toLowerCase() === lc) { const v = props[k]; if (v != null && String(v).trim() && String(v).trim().toLowerCase() !== 'null') return String(v).trim(); } } return ''; };
+    const utrAfisare = _a('utr_afisare');
+    const utrPug    = _a('utr_pug') || _a('den_regulament');
+    const utr       = _a('utr');
+    document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
+    document.getElementById('attrLayerName').textContent = utrAfisare || layer.name;
+    document.getElementById('attrGeomType').textContent  = utr || 'Zonă funcțională';
+    const entries = Object.entries(props).filter(([,v]) => v != null && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'null');
+    let html = '<table class="attr-tbl"><tbody>' + entries.map(([k,v]) => `<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('') + '</tbody></table>';
+    if (utrPug) {
+      html += `<button onclick="loadRegimTehnic('${utrPug.replace(/'/g,"\\'")}') " style="width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">📋 Extinde regim tehnic</button>`;
+      html += '<div id="regimTehnicContent"></div>';
+    }
+    scroll.innerHTML = html;
+    document.getElementById('attrPanel').classList.remove('hidden');
+    return;
+  }
 
   document.getElementById('attrHdr').style.borderLeftColor = layer.color;
 
@@ -1413,11 +1492,22 @@ async function loadCadSearchIndex() {
 // Creează un layer FGB streaming (fără date inițiale)
 function createFgbLayer(id, name, color, fgbUrl, opts) {
   opts = opts || {};
-  const style = () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
+  const rdr = opts._renderer || null;
+  const style = rdr
+    ? f => rendererStyle(rdr, f, false)
+    : () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
-    lyr.on('mouseover', function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 }); });
-    lyr.on('mouseout',  function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 }); });
+    lyr.on('mouseover', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
+      else this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 });
+    });
+    lyr.on('mouseout', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
+      else this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 });
+    });
   };
 
   const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach });
@@ -1432,6 +1522,8 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     _withLabels: opts._withLabels || false,
     _labelField: opts._labelField,
     _labelMinZoom: opts._labelMinZoom,
+    _renderer: rdr,
+    _isPug: opts._isPug || false,
     leafletLayer: geoLayer,
     fgbUrl
   };
@@ -1612,167 +1704,22 @@ const ArcGISDynamic = L.Layer.extend({
   renderTree();
 })();
 
-// ── Straturi Urbanism — CJ Gorj ArcGIS ────────
+// ── Straturi Urbanism — locale FGB ────────
 (function() {
-  // Zone Protecție — MapServer layer 1 (added first → appears last in sidebar)
-  const zpDyn = new ArcGISDynamic(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    { opacity: 0.85, attribution: '© CJ Gorj',
-      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
-      layers: 1 }
-  );
-  layers.push({
-    id: 'static_zone_protectie',
-    name: 'Zone Protecție',
-    cat: 'urbanism',
-    color: '#795548',
-    format: 'WMS',
-    geojson: { type:'FeatureCollection', features:[] },
-    visible: false,
-    static: true,
-    _isTile: true,
-    leafletLayer: zpDyn,
-  });
-
-  // PUZ — MapServer layer 2
-  const puzDyn = new ArcGISDynamic(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    { opacity: 0.85, attribution: '© CJ Gorj',
-      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
-      layers: 2 }
-  );
-  const puzLayer = {
-    id: 'static_puz',
-    name: 'PUZ',
-    cat: 'urbanism',
-    color: '#6c3483',
-    format: 'WMS',
-    geojson: { type:'FeatureCollection', features:[] },
-    visible: false,
-    static: true,
-    _isTile: true,
-    leafletLayer: puzDyn,
-  };
-  layers.push(puzLayer);
-
-  // PUG — MapServer layer 0
-  const pugDyn = new ArcGISDynamic(
-    'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer',
-    { opacity: 0.85, attribution: '© CJ Gorj',
-      proxy: 'https://gis.cjgorj.ro/proxy/proxy.ashx?',
-      layers: 0 }
-  );
-  const pugLayer = {
-    id: 'static_pug',
-    name: 'PUG',
-    cat: 'urbanism',
-    color: '#e74c3c',
-    format: 'WMS',
-    geojson: { type:'FeatureCollection', features:[] },
-    visible: false,
-    static: true,
-    _isTile: true,
-    leafletLayer: pugDyn,
-  };
-  layers.push(pugLayer);
-
-  // Limite Intravilan (added last → appears first in sidebar)
-  createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6', 'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
+  const BASE = 'https://github.com/camui-alexandru/gis-gorj/releases/download/v1-data/';
+  // Zone Protecție
+  createFgbLayer('static_zone_protectie', 'Zone Protecție', '#795548',
+    BASE + 'ZoneProtectie.fgb', { cat:'urbanism', minZoom:9 });
+  // PUZ
+  createFgbLayer('static_puz', 'PUZ', '#6c3483',
+    BASE + 'PUZ.fgb', { cat:'urbanism', minZoom:9 });
+  // PUG — cu renderer autentic și afișaj special
+  createFgbLayer('static_pug', 'PUG', '#e74c3c',
+    BASE + 'PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true });
+  // Limite Intravilan
+  createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
+    'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
   renderTree();
-
-  // Geometria selectată pe hartă
-  let pugHighlight = null;
-  function clearPugHighlight() {
-    if (pugHighlight) { map.removeLayer(pugHighlight); pugHighlight = null; }
-  }
-
-  // Convertește geometrie ArcGIS (rings/paths) în coordonate Leaflet [lat,lng]
-  function arcgisToLatLngs(geometry) {
-    const rings = geometry.rings || geometry.paths;
-    if (!rings) return null;
-    return rings.map(ring => ring.map(pt => [pt[1], pt[0]]));
-  }
-
-  // Identify on click — trimite request la MapServer prin proxy
-  map.on('click', async function(e) {
-    if ((!pugLayer.visible && !puzLayer.visible) || activeTool !== 'pan') return;
-    clearPugHighlight();
-    const b = map.getBounds();
-    const s = map.getSize();
-    const visLayers = [];
-    if (pugLayer.visible) visLayers.push(0);
-    if (puzLayer.visible) visLayers.push(2);
-    const identifyUrl = 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/identify' +
-      '?geometry=' + e.latlng.lng + ',' + e.latlng.lat +
-      '&geometryType=esriGeometryPoint&sr=4326&layers=visible:' + visLayers.join(',') + '&tolerance=10' +
-      '&mapExtent=' + b.getWest() + ',' + b.getSouth() + ',' + b.getEast() + ',' + b.getNorth() +
-      '&imageDisplay=' + s.x + ',' + s.y + ',96&returnGeometry=true&f=json';
-    try {
-      const resp = await fetch('https://gis.cjgorj.ro/proxy/proxy.ashx?' + identifyUrl);
-      const data = await resp.json();
-      if (data.results && data.results.length > 0) {
-        // Find best result — prefer one with a valid utr_pug/den_regulament for regulament
-        let r = data.results[0];
-        for (const candidate of data.results) {
-          const a = candidate.attributes || {};
-          for (const k in a) {
-            if (k.toLowerCase() === 'utr_pug' || k.toLowerCase() === 'den_regulament') {
-              const v = a[k];
-              if (v && String(v).trim() && String(v).trim().toLowerCase() !== 'null') {
-                r = candidate; break;
-              }
-            }
-          }
-          if (r === candidate && candidate !== data.results[0]) break;
-        }
-        const attrs = r.attributes || {};
-
-        // Desenează geometria selectată
-        if (r.geometry) {
-          const latlngs = arcgisToLatLngs(r.geometry);
-          if (latlngs) {
-            pugHighlight = L.polygon(latlngs, {
-              color: '#ffeb3b', weight: 3, fillColor: '#ffeb3b',
-              fillOpacity: 0.25, dashArray: '6,4', interactive: false
-            }).addTo(map);
-          }
-        }
-
-        // Construiește panoul de atribute — lookup case-insensitive
-        const _attr = name => { const lc = name.toLowerCase(); for (const k in attrs) { if (k.toLowerCase() === lc) { const v = attrs[k]; if (v && String(v).trim() && String(v).trim().toLowerCase() !== 'null') return String(v).trim(); } } return ''; };
-        const utrAfisare = _attr('utr_afisare');
-        const utrPug = _attr('utr_pug') || _attr('den_regulament');
-        const tip = _attr('tip');
-        const obs = _attr('obs');
-        const utr = _attr('utr');
-        const isPuz = r.layerId === 2;
-
-        document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
-        document.getElementById('attrLayerName').textContent = utrAfisare || r.layerName || (isPuz ? 'PUZ' : 'PUG');
-        document.getElementById('attrGeomType').textContent = utr || 'Zonă funcțională';
-
-        const entries = Object.entries(attrs).filter(([,v]) =>
-          v !== null && v !== undefined && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'null');
-
-        let html = '<table class="attr-tbl"><tbody>' + entries.map(([k,v]) =>
-            '<tr><td>' + k + '</td><td>' + String(v) + '</td></tr>').join('') + '</tbody></table>';
-
-        if (utrPug) {
-          html += '<button onclick="loadRegimTehnic(\'' + utrPug + '\')" style="' +
-            'width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;' +
-            'border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;' +
-            'transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px' +
-            '">📋 Extinde regim tehnic</button>';
-          html += '<div id="regimTehnicContent"></div>';
-        }
-
-        document.getElementById('attrScroll').innerHTML = html;
-        document.getElementById('attrPanel').classList.remove('hidden');
-      }
-    } catch(err) {
-      console.warn('PUG identify error:', err);
-    }
-  });
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
   window.loadRegimTehnic = function(utrPug) {
@@ -1887,12 +1834,6 @@ const ArcGISDynamic = L.Layer.extend({
       .catch(function() { openFallback(w); });
   };
 
-  // Curăță selecția când se închide panoul de atribute
-  const origCloseAttr = window.closeAttr;
-  window.closeAttr = function() {
-    clearPugHighlight();
-    origCloseAttr();
-  };
 })();
 
 // ═══════════════════════════════════════════════════════════════════

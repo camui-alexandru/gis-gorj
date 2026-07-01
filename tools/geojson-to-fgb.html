@@ -40,6 +40,7 @@ async function convert(input) {
     return;
   }
 
+  // filtrează geometrii null
   const before = geojson.features?.length ?? 0;
   geojson.features = (geojson.features || []).filter(
     f => f.geometry?.type && Array.isArray(f.geometry?.coordinates)
@@ -50,7 +51,7 @@ async function convert(input) {
 
   let fgb;
   try {
-    await new Promise(r => setTimeout(r, 30));
+    await new Promise(r => setTimeout(r, 30)); // lasă UI să se actualizeze
     fgb = flatgeobuf.serialize(geojson);
   } catch(e) {
     status.className = 'err';
