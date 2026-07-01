@@ -509,15 +509,18 @@ const CATEGORIES = [
 const PUG_RENDERER = {
   field: 'tip',
   values: {
-    '-//-':       { fill:[255,190,190], outline:[0,0,0] },
+    '-//-':       { fill:[0,0,0,0],    outline:[0,0,0,0] },
     'Alte UTR-uri':{ fill:[232,190,255], outline:[0,0,0] },
     'UAT':        { fill:[0,0,0,0],    outline:[255,0,0] },
     'V':          { fill:[70,176,0],   outline:[0,0,0] },
+    'V1':         { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'V2':         { fill:[0,0,0,0],    outline:[0,0,0,0] },
     'TAI':        { fill:[255,255,190],outline:[0,0,0] },
     'G2':         { fill:[168,56,0],   outline:[0,0,0] },
     'Cca':        { fill:[190,255,232],outline:[0,0,0] },
     'Ccf':        { fill:[169,0,230],  outline:[0,0,0] },
     'Ccn':        { fill:[0,197,255],  outline:[0,0,0] },
+    'CCN':        { fill:[0,197,255],  outline:[0,0,0] },
     'Ccr':        { fill:[197,0,255],  outline:[0,0,0] },
     'C':          { fill:[230,0,0],    outline:[0,0,0] },
     'DS':         { fill:[223,115,255],outline:[0,0,0] },
@@ -527,11 +530,15 @@ const PUG_RENDERER = {
     'IS':         { fill:[255,0,0],    outline:[0,0,0] },
     'M1':         { fill:[0,169,230],  outline:[0,0,0] },
     'M2':         { fill:[168,0,0],    outline:[110,110,110] },
+    'M3':         { fill:[120,0,0],    outline:[110,110,110] },
     'M':          { fill:[230,0,0],    outline:[0,0,0] },
     'L1':         { fill:[255,255,0],  outline:[0,0,0] },
     'L2':         { fill:[255,255,115],outline:[0,0,0] },
     'A':          { fill:[0,92,230],   outline:[0,0,0] },
     'I':          { fill:[115,115,0],  outline:[0,0,0] },
+    'S':          { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'TE':         { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'Zona cai de comunicatie rutiera si amenajari aferente': { fill:[0,0,0,0], outline:[0,0,0,0] },
   }
 };
 function rgbaToHex([r,g,b,a=255]) {
@@ -539,11 +546,21 @@ function rgbaToHex([r,g,b,a=255]) {
   return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }
 function rendererStyle(renderer, feature, hovered) {
-  const val = feature.properties?.[renderer.field];
+  const props = feature.properties || {};
+  // filtrare date de test (ex: "CRASNA - test", "CRASNA-test")
+  if (/[-\s]test\b/i.test(String(props.utr_afisare || ''))) {
+    return { color:'transparent', weight:0, opacity:0, fillColor:'transparent', fillOpacity:0 };
+  }
+  // filtrare features extravilan/administrativ (acoperă întreg teritoriul UAT)
+  const utr = String(props.utr || '').toLowerCase();
+  if (utr.endsWith('-comuna') || utr.includes('extravilan') || utr.includes('teritoriu')) {
+    return { color:'transparent', weight:0, opacity:0, fillColor:'transparent', fillOpacity:0 };
+  }
+  const val = props[renderer.field];
   const entry = renderer.values[val];
-  const fill   = entry ? rgbaToHex(entry.fill)    : '#cccccc';
-  const stroke = entry ? rgbaToHex(entry.outline) : '#000000';
-  const fillA  = entry ? (entry.fill[3] ?? 255) / 255 : 0.35;
+  const fill   = entry ? rgbaToHex(entry.fill)    : 'transparent';
+  const stroke = entry ? rgbaToHex(entry.outline) : 'transparent';
+  const fillA  = entry ? (entry.fill[3] ?? 255) / 255 : 0;
   return {
     color:       stroke === 'transparent' ? 'transparent' : stroke,
     weight:      hovered ? 2.5 : 1,
