@@ -1723,16 +1723,15 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Straturi Urbanism — locale FGB ────────
 (function() {
-  const BASE = 'https://github.com/camui-alexandru/gis-gorj/releases/download/v1-data/';
   // Zone Protecție
   createFgbLayer('static_zone_protectie', 'Zone Protecție', '#795548',
-    BASE + 'ZoneProtectie.fgb', { cat:'urbanism', minZoom:9 });
+    'DATA/ZoneProtectie.fgb', { cat:'urbanism', minZoom:9 });
   // PUZ
   createFgbLayer('static_puz', 'PUZ', '#6c3483',
-    BASE + 'PUZ.fgb', { cat:'urbanism', minZoom:9 });
+    'DATA/PUZ.fgb', { cat:'urbanism', minZoom:9 });
   // PUG — cu renderer autentic și afișaj special
   createFgbLayer('static_pug', 'PUG', '#e74c3c',
-    BASE + 'PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true });
+    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true });
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
