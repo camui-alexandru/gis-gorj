@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>GeoJSON → FlatGeobuf</title>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<style>
+  body { font-family: sans-serif; max-width: 520px; margin: 60px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  h2 { color: #7ec8e3; }
+  label { display:block; margin: 24px 0 8px; font-size: 14px; color: #aaa; }
+  input[type=file] { width:100%; padding:10px; background:#0f3460; border:1px solid #7ec8e3; border-radius:6px; color:#eee; cursor:pointer; }
+  #status { margin-top:20px; padding:14px; border-radius:6px; background:#0f3460; font-size:13px; min-height:40px; white-space:pre-wrap; }
+  #status.ok  { border-left: 4px solid #2ecc71; }
+  #status.err { border-left: 4px solid #e74c3c; }
+  #status.run { border-left: 4px solid #f39c12; }
+</style>
+</head>
+<body>
+<h2>GeoJSON → FlatGeobuf</h2>
+<label>Selectează fișierul GeoJSON:</label>
+<input type="file" accept=".geojson,.json" onchange="convert(this)">
+<div id="status">Aștept fișier...</div>
+
+<script>
+async function convert(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('status');
+  status.className = 'run';
+  status.textContent = `Citesc ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)...`;
+
+  let geojson;
+  try {
+    const text = await file.text();
+    status.textContent = 'Parsez JSON...';
+    geojson = JSON.parse(text);
+  } catch(e) {
+    status.className = 'err';
+    status.textContent = 'Eroare: JSON invalid\n' + e.message;
+    return;
+  }
+
+  // filtrează geometrii null
+  const before = geojson.features?.length ?? 0;
+  geojson.features = (geojson.features || []).filter(
+    f => f.geometry?.type && Array.isArray(f.geometry?.coordinates)
+  );
+  const removed = before - geojson.features.length;
+
+  status.textContent = `Convertesc ${geojson.features.length} features${removed ? ` (${removed} geometrii null eliminate)` : ''}...`;
+
+  let fgb;
+  try {
+    await new Promise(r => setTimeout(r, 30)); // lasă UI să se actualizeze
+    fgb = flatgeobuf.serialize(geojson);
+  } catch(e) {
+    status.className = 'err';
+    status.textContent = 'Eroare la serializare:\n' + e.message;
+    return;
+  }
+
+  const sizeMB = (fgb.byteLength / 1024 / 1024).toFixed(2);
+  const outName = file.name.replace(/\.(geojson|json)$/i, '.fgb');
+
+  const blob = new Blob([fgb]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = outName;
+  a.click();
+
+  status.className = 'ok';
+  status.textContent = `✓ Descărcat: ${outName}\nDimensiune FGB: ${sizeMB} MB\nFeatures: ${geojson.features.length}`;
+}
+</script>
+</body>
+</html>
