@@ -505,6 +505,54 @@ const CATEGORIES = [
 ];
 
 
+// Renderer PUG: culori autentice din gis.cjgorj.ro (câmp: "tip")
+const PUG_RENDERER = {
+  field: 'tip',
+  values: {
+    '-//-':       { fill:[255,190,190], outline:[0,0,0] },
+    'Alte UTR-uri':{ fill:[232,190,255], outline:[0,0,0] },
+    'UAT':        { fill:[0,0,0,0],    outline:[255,0,0] },
+    'V':          { fill:[70,176,0],   outline:[0,0,0] },
+    'TAI':        { fill:[255,255,190],outline:[0,0,0] },
+    'G2':         { fill:[168,56,0],   outline:[0,0,0] },
+    'Cca':        { fill:[190,255,232],outline:[0,0,0] },
+    'Ccf':        { fill:[169,0,230],  outline:[0,0,0] },
+    'Ccn':        { fill:[0,197,255],  outline:[0,0,0] },
+    'Ccr':        { fill:[197,0,255],  outline:[0,0,0] },
+    'C':          { fill:[230,0,0],    outline:[0,0,0] },
+    'DS':         { fill:[223,115,255],outline:[0,0,0] },
+    'Extravilan': { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'EX1':        { fill:[0,0,0,0],    outline:[0,0,0,0] },
+    'G1':         { fill:[168,56,0],   outline:[110,110,110] },
+    'IS':         { fill:[255,0,0],    outline:[0,0,0] },
+    'M1':         { fill:[0,169,230],  outline:[0,0,0] },
+    'M2':         { fill:[168,0,0],    outline:[110,110,110] },
+    'M':          { fill:[230,0,0],    outline:[0,0,0] },
+    'L1':         { fill:[255,255,0],  outline:[0,0,0] },
+    'L2':         { fill:[255,255,115],outline:[0,0,0] },
+    'A':          { fill:[0,92,230],   outline:[0,0,0] },
+    'I':          { fill:[115,115,0],  outline:[0,0,0] },
+  }
+};
+function rgbaToHex([r,g,b,a=255]) {
+  if (a === 0) return 'transparent';
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function rendererStyle(renderer, feature, hovered) {
+  const val = feature.properties?.[renderer.field];
+  const entry = renderer.values[val];
+  const fill   = entry ? rgbaToHex(entry.fill)    : '#cccccc';
+  const stroke = entry ? rgbaToHex(entry.outline) : '#000000';
+  const fillA  = entry ? (entry.fill[3] ?? 255) / 255 : 0.35;
+  return {
+    color:       stroke === 'transparent' ? 'transparent' : stroke,
+    weight:      hovered ? 2.5 : 1,
+    opacity:     stroke === 'transparent' ? 0 : 0.9,
+    fillColor:   fill,
+    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA),
+  };
+}
+
 const CAT_STATE = {}; // { catId: { open: bool } }
 CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
 const GROUP_STATE = {};
@@ -748,13 +796,24 @@ function getNationalC(props) {
 
 function buildLeafletLayer(layer) {
   const withLabels = hasNationalC(layer);
-  const style = () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
+  const rdr = layer._renderer || null;
+  const style = rdr
+    ? f => rendererStyle(rdr, f, false)
+    : () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
   const ptLayer = (f, ll) => L.circleMarker(ll, { radius:6, color:layer.color, fillColor:layer.color, fillOpacity:.75, weight:2 });
 
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, layer); });
-    lyr.on('mouseover', function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 }); });
-    lyr.on('mouseout',  function() { if (activeTool !== 'pan') return; this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 }); });
+    lyr.on('mouseover', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
+      else this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 });
+    });
+    lyr.on('mouseout', function() {
+      if (activeTool !== 'pan') return;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
+      else this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 });
+    });
   };
 
   const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach });
