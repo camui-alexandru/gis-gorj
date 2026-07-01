@@ -1524,6 +1524,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     _labelMinZoom: opts._labelMinZoom,
     _renderer: rdr,
     _isPug: opts._isPug || false,
+    _noIndex: opts._noIndex || false,
     leafletLayer: geoLayer,
     fgbUrl
   };
@@ -1570,13 +1571,17 @@ async function refreshFgbLayers() {
     tasks.push((async () => {
       try {
         const features = [];
-        // Descărcăm tot fișierul o dată și deserializăm din buffer (evită probleme cu index spațial lipsă)
-        const buf = await getFgbBuffer(l.fgbUrl);
-        for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
+        if (l._noIndex) {
+          // Fișiere fără index spațial: descărcăm complet o dată și filtrăm în memorie
+          const buf = await getFgbBuffer(l.fgbUrl);
+          for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
+        } else {
+          // Fișiere cu index spațial: streaming Range requests eficient
+          for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
+        }
         l.geojson.features = features;
         l.leafletLayer.clearLayers();
         l.leafletLayer.addData({ type:'FeatureCollection', features });
-        if (features.length) console.log(`FGB ${l.id}: ${features.length} features loaded`);
       } catch(e) { console.error('FGB load error', l.id, e); }
     })());
   }
@@ -1722,13 +1727,13 @@ const ArcGISDynamic = L.Layer.extend({
 (function() {
   // Zone Protecție
   createFgbLayer('static_zone_protectie', 'Zone Protecție', '#795548',
-    'DATA/ZoneProtectie.fgb', { cat:'urbanism', minZoom:9 });
+    'DATA/ZoneProtectie.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   // PUZ
   createFgbLayer('static_puz', 'PUZ', '#6c3483',
-    'DATA/PUZ.fgb', { cat:'urbanism', minZoom:9 });
+    'DATA/PUZ.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   // PUG — cu renderer autentic și afișaj special
   createFgbLayer('static_pug', 'PUG', '#e74c3c',
-    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true });
+    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true, _noIndex:true });
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
