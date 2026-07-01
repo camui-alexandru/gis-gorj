@@ -1620,6 +1620,15 @@ async function refreshFgbLayers() {
           // Fișiere cu index spațial: streaming Range requests eficient
           for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
         }
+        // Sort largest envelopes first so smaller features (roads, zones) render on top
+        if (l._isPug) {
+          features.sort((a, b) => {
+            const ea = a._env, eb = b._env;
+            const sA = ea ? (ea[2]-ea[0])*(ea[3]-ea[1]) : 0;
+            const sB = eb ? (eb[2]-eb[0])*(eb[3]-eb[1]) : 0;
+            return sB - sA;
+          });
+        }
         l.geojson.features = features;
         l.leafletLayer.clearLayers();
         l.leafletLayer.addData({ type:'FeatureCollection', features });
