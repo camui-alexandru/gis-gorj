@@ -1582,19 +1582,18 @@ async function refreshFgbLayers() {
       try {
         const features = [];
         if (l._noIndex) {
-          // Fișiere fără index spațial: descărcăm complet o dată, cache toate features cu envelope pre-calculat
+          // Fișiere fără index spațial: stream complet cu world-rect, cache features cu envelope
           if (!l._cachedFeatures) {
-            const buf = await getFgbBuffer(l.fgbUrl);
             l._cachedFeatures = [];
-            for await (const f of flatgeobuf.deserialize(buf)) {
-              if (f.geometry?.coordinates) {
-                f._env = calcEnvelope(f.geometry.coordinates);
-              }
+            const resp = await fetch(l.fgbUrl);
+            const WORLD = { minX:-180, minY:-90, maxX:180, maxY:90 };
+            for await (const f of flatgeobuf.deserialize(resp.body, WORLD)) {
+              if (f.geometry?.coordinates) f._env = calcEnvelope(f.geometry.coordinates);
               l._cachedFeatures.push(f);
             }
             console.log(`FGB ${l.id}: ${l._cachedFeatures.length} features cached`);
           }
-          // Filtrare rapidă după bbox
+          // Filtrare rapidă după bbox viewport
           const { minX, minY, maxX, maxY } = rect;
           for (const f of l._cachedFeatures) {
             const e = f._env;
