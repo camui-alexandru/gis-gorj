@@ -1540,6 +1540,18 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
 
 // Încarcă features FGB pentru bbox curent
 let fgbLoadTimer = null;
+// Cache pentru fișiere FGB descărcate complet (evită redirect issues cu Range requests)
+const FGB_BUFFER_CACHE = {};
+
+async function getFgbBuffer(url) {
+  if (FGB_BUFFER_CACHE[url]) return FGB_BUFFER_CACHE[url];
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} la ${url}`);
+  const buf = new Uint8Array(await resp.arrayBuffer());
+  FGB_BUFFER_CACHE[url] = buf;
+  return buf;
+}
+
 async function refreshFgbLayers() {
   const zoom = map.getZoom();
   const b = map.getBounds();
@@ -1557,8 +1569,13 @@ async function refreshFgbLayers() {
     tasks.push((async () => {
       try {
         const features = [];
-        for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) {
-          features.push(f);
+        // Fișierele externe (release assets) se descarcă integral o dată și se caches-uiesc
+        const useCache = l.fgbUrl.startsWith('http');
+        if (useCache) {
+          const buf = await getFgbBuffer(l.fgbUrl);
+          for await (const f of flatgeobuf.deserialize(buf, rect)) features.push(f);
+        } else {
+          for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
         }
         l.geojson.features = features;
         l.leafletLayer.clearLayers();
