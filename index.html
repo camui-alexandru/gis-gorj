@@ -545,7 +545,7 @@ function rgbaToHex([r,g,b,a=255]) {
   if (a === 0) return 'transparent';
   return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }
-function rendererStyle(renderer, feature, hovered) {
+function rendererStyle(renderer, feature, hovered, opacityMult = 1) {
   const props = feature.properties || {};
   // filtrare date de test (ex: "CRASNA - test", "CRASNA-test")
   if (/[-\s]test\b/i.test(String(props.utr_afisare || ''))) {
@@ -564,9 +564,9 @@ function rendererStyle(renderer, feature, hovered) {
   return {
     color:       stroke === 'transparent' ? 'transparent' : stroke,
     weight:      hovered ? 2.5 : 1,
-    opacity:     stroke === 'transparent' ? 0 : 0.9,
+    opacity:     stroke === 'transparent' ? 0 : 0.9 * opacityMult,
     fillColor:   fill,
-    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA),
+    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA) * opacityMult,
   };
 }
 
@@ -1042,7 +1042,10 @@ function setLayerOpacity(id, opacity, slider) {
   if (!layer) return;
   layer._opacity = opacity;
   if (layer.leafletLayer) {
-    if (typeof layer.leafletLayer.setOpacity === 'function') {
+    const rdr = layer._renderer;
+    if (rdr && typeof layer.leafletLayer.setStyle === 'function') {
+      layer.leafletLayer.setStyle(f => rendererStyle(rdr, f, false, opacity));
+    } else if (typeof layer.leafletLayer.setOpacity === 'function') {
       layer.leafletLayer.setOpacity(opacity);
     } else if (typeof layer.leafletLayer.setStyle === 'function') {
       layer.leafletLayer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.3 });
@@ -1517,13 +1520,15 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
-      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
-      else this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 });
+      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true, op));
+      else this.setStyle && this.setStyle({ weight:2.5, opacity:op, fillOpacity:op * 0.5 });
     });
     lyr.on('mouseout', function() {
       if (activeTool !== 'pan') return;
-      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
-      else this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 });
+      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false, op));
+      else this.setStyle && this.setStyle({ weight:1.2, opacity:op * 0.9, fillOpacity:op * 0.3 });
     });
   };
 
