@@ -1633,10 +1633,11 @@ async function refreshFgbLayers() {
           const TIP_PRIORITY = {
             'UAT':0, '-//-':1, 'Extravilan':1, 'EX1':1, 'TE':2, 'V2':2,
             'A':3, 'S':3, 'V':4, 'V1':4, 'G1':4, 'G2':4,
-            'TAI':5, 'L1':6, 'L2':6, 'M':6, 'M1':6, 'M2':6, 'M3':6,
-            'C':7, 'IS':7, 'I':7, 'DS':7, 'Alte UTR-uri':7,
-            'Cca':8, 'Ccf':8, 'Ccn':8, 'CCN':8, 'Ccr':8,
-            'Zona cai de comunicatie rutiera si amenajari aferente':8,
+            'TAI':5,
+            'Cca':6, 'Ccf':6, 'Ccn':6, 'CCN':6, 'Ccr':6,
+            'Zona cai de comunicatie rutiera si amenajari aferente':6,
+            'L1':7, 'L2':7, 'M':7, 'M1':7, 'M2':7, 'M3':7,
+            'C':8, 'IS':8, 'I':8, 'DS':8, 'Alte UTR-uri':8,
           };
           features.sort((a, b) => {
             const pa = TIP_PRIORITY[a.properties?.tip] ?? 5;
