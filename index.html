@@ -1620,13 +1620,24 @@ async function refreshFgbLayers() {
           // Fișiere cu index spațial: streaming Range requests eficient
           for await (const f of flatgeobuf.deserialize(l.fgbUrl, rect)) features.push(f);
         }
-        // Sort largest envelopes first so smaller features (roads, zones) render on top
+        // Sort PUG features by type priority so roads/networks always render on top
         if (l._isPug) {
+          const TIP_PRIORITY = {
+            'UAT':0, '-//-':1, 'Extravilan':1, 'EX1':1, 'TE':2, 'V2':2,
+            'A':3, 'S':3, 'V':4, 'V1':4, 'G1':4, 'G2':4,
+            'TAI':5, 'L1':6, 'L2':6, 'M':6, 'M1':6, 'M2':6, 'M3':6,
+            'C':7, 'IS':7, 'I':7, 'DS':7, 'Alte UTR-uri':7,
+            'Cca':8, 'Ccf':8, 'Ccn':8, 'CCN':8, 'Ccr':8,
+            'Zona cai de comunicatie rutiera si amenajari aferente':8,
+          };
           features.sort((a, b) => {
-            const ea = a._env, eb = b._env;
-            const sA = ea ? (ea[2]-ea[0])*(ea[3]-ea[1]) : 0;
-            const sB = eb ? (eb[2]-eb[0])*(eb[3]-eb[1]) : 0;
-            return sB - sA;
+            const pa = TIP_PRIORITY[a.properties?.tip] ?? 5;
+            const pb = TIP_PRIORITY[b.properties?.tip] ?? 5;
+            if (pa !== pb) return pa - pb; // lower priority drawn first (bottom)
+            // same priority: larger area drawn first
+            const areaA = a.properties?.['st_area(shape)'] || 0;
+            const areaB = b.properties?.['st_area(shape)'] || 0;
+            return areaB - areaA;
           });
         }
         l.geojson.features = features;
