@@ -105,24 +105,22 @@ function clearLog() { logEl().textContent = ''; logEl().className = ''; }
 async function downloadService(svc, progStart, progEnd) {
   const prog = document.getElementById('prog');
 
-  // Layer metadata (geometryType)
   appendLog(`[${svc.label}] Obtin metadata...`);
   const meta = await jsonp(svc.url + '?f=json');
   const geomType = meta.geometryType || 'esriGeometryPolygon';
   appendLog(`[${svc.label}] Tip geom: ${geomType}`);
 
-  // Total count
   const cntData = await jsonp(svc.url + '/query?where=1%3D1&returnCountOnly=true&f=json');
   const total = cntData.count ?? '?';
   appendLog(`[${svc.label}] Features în serviciu: ${total}`);
 
-  // All objectIds
   const idsData = await jsonp(svc.url + '/query?where=1%3D1&returnIdsOnly=true&f=json');
   const ids = (idsData.objectIds || []).sort((a, b) => a - b);
   appendLog(`[${svc.label}] ID-uri obținute: ${ids.length}`);
 
   const features = [];
   const nBatches = Math.ceil(ids.length / BATCH);
+  let failedBatches = 0;
 
   for (let i = 0; i < ids.length; i += BATCH) {
     const batch = ids.slice(i, i + BATCH);
@@ -131,7 +129,20 @@ async function downloadService(svc, progStart, progEnd) {
     appendLog(`[${svc.label}] Lot ${bn}/${nBatches}  feat: ${features.length}`);
 
     const qs = 'objectIds=' + batch.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&f=json';
-    const data = await jsonp(svc.url + '/query?' + qs);
+
+    // Retry de 3 ori înainte să sară lotul
+    let data = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        data = await jsonp(svc.url + '/query?' + qs);
+        break;
+      } catch(e) {
+        appendLog(`[${svc.label}] Lot ${bn} attempt ${attempt}/3 eșuat: ${e.message}`);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+      }
+    }
+
+    if (!data) { failedBatches++; continue; } // sare lotul după 3 încercări
 
     for (const feat of (data.features || [])) {
       const geom = esriGeomToGeoJSON(feat.geometry, geomType);
@@ -141,8 +152,9 @@ async function downloadService(svc, progStart, progEnd) {
     await new Promise(r => setTimeout(r, 80));
   }
 
+  if (failedBatches > 0) appendLog(`[${svc.label}] ⚠ ${failedBatches} loturi eșuate (sărite)`);
   appendLog(`[${svc.label}] ✓ ${features.length} features OK`);
-  return features;
+  return features; // returnează ce s-a colectat chiar dacă unele loturi au eșuat
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
