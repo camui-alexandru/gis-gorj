@@ -2,200 +2,207 @@
 <html lang="ro">
 <head>
 <meta charset="UTF-8">
-<title>Descarcă PUG complet — gis.cjgorj.ro</title>
+<title>Descarcă PUG — gis.cjgorj.ro</title>
 <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
 <style>
   body { font-family: sans-serif; max-width: 660px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
-  h2 { color: #7ec8e3; margin-bottom: 6px; }
-  p  { color: #aaa; font-size: 13px; line-height: 1.6; margin: 6px 0; }
-  button { padding: 12px 28px; background: #8e44ad; color: #fff; border: none; border-radius: 6px;
-           cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 12px; }
+  h2 { color: #7ec8e3; }
+  p  { color: #aaa; font-size: 13px; line-height: 1.6; }
+  button { padding: 12px 32px; background: #8e44ad; color: #fff; border: none; border-radius: 6px;
+           cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 10px; }
   button:disabled { background: #444; cursor: not-allowed; }
-  #status { margin-top: 16px; padding: 14px; border-radius: 6px; background: #0f3460;
-            font-size: 13px; min-height: 80px; white-space: pre-wrap; line-height: 1.8; }
-  #status.ok  { border-left: 4px solid #2ecc71; }
-  #status.err { border-left: 4px solid #e74c3c; }
-  #status.run { border-left: 4px solid #f39c12; }
-  progress { width: 100%; height: 12px; margin-top: 10px; border-radius: 4px; }
-  .src { background:#0a1f3d; border-radius:6px; padding:10px 14px; margin:8px 0; font-size:12px; color:#7ec8e3; }
+  #log { margin-top: 16px; padding: 14px; border-radius: 6px; background: #0a1a30;
+         font-size: 12px; min-height: 100px; white-space: pre-wrap; line-height: 1.9;
+         font-family: monospace; border-left: 4px solid #f39c12; max-height: 400px; overflow-y: auto; }
+  #log.ok  { border-left-color: #2ecc71; }
+  #log.err { border-left-color: #e74c3c; }
+  progress { width: 100%; height: 10px; margin-top: 10px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <h2>Descarcă PUG.fgb complet</h2>
-
-<div class="src">📡 Sursă 1 — MapServer/0:<br>gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0</div>
-<div class="src">📡 Sursă 2 — FeatureServer/3:<br>gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3</div>
-
-<p>Descarcă toate features din ambele surse (folosind returnIdsOnly pentru completitudine), le îmbină și exportă un singur <strong>PUG.fgb</strong>.</p>
-
+<p>Descarcă toate features din <b>MapServer/0</b> și <b>FeatureServer/3</b>, le îmbină și exportă <b>PUG.fgb</b>.<br>
+Folosește JSONP — funcționează chiar și când fișierul e deschis local (fără server web).</p>
 <button id="btn" onclick="startDownload()">▶ Descarcă PUG.fgb complet</button>
 <progress id="prog" value="0" max="100"></progress>
-<div id="status">Apasă butonul pentru a începe.</div>
+<div id="log">Apasă butonul pentru a începe...</div>
 
 <script>
-const SOURCES = [
-  { label: 'MapServer/0',    base: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0/query' },
-  { label: 'FeatureServer/3', base: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3/query' },
+const SERVICES = [
+  { label: 'MapServer/0',     url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0' },
+  { label: 'FeatureServer/3', url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3' },
 ];
-const PROXY = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
-const BATCH = 500;
+const BATCH = 250; // features per JSONP request (conservativ)
 
-let useProxy = false;
-let logLines = [];
-
-function log(msg) {
-  logLines.push(msg);
-  document.getElementById('status').textContent = logLines.slice(-12).join('\n');
+// ── JSONP helper ──────────────────────────────────────────────────────────────
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_jcb' + Date.now() + Math.floor(Math.random() * 99999);
+    const script = document.createElement('script');
+    let settled = false;
+    const cleanup = () => { if (!settled) { settled = true; delete window[cbName]; script.remove(); } };
+    window[cbName] = data => {
+      cleanup();
+      if (data && data.error) reject(new Error('ArcGIS ' + data.error.code + ': ' + data.error.message));
+      else resolve(data);
+    };
+    script.onerror = () => { cleanup(); reject(new Error('Eroare JSONP: ' + url.slice(0, 80))); };
+    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+    document.head.appendChild(script);
+  });
 }
 
-function setErr(msg) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = 'err';
+// ── Esri JSON → GeoJSON geometry ─────────────────────────────────────────────
+function signedArea(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length - 1; i++)
+    a += ring[i][0] * ring[i+1][1] - ring[i+1][0] * ring[i][1];
+  return a / 2;
 }
 
-async function apiFetch(queryUrl) {
-  const target = useProxy ? PROXY + encodeURIComponent(queryUrl) : queryUrl;
-  const resp = await fetch(target);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (data.error) throw new Error(`ArcGIS ${data.error.code}: ${data.error.message}`);
-  return data;
+function esriGeomToGeoJSON(geom, geomType) {
+  if (!geom) return null;
+  if (geomType === 'esriGeometryPoint') {
+    if (geom.x == null) return null;
+    return { type: 'Point', coordinates: [geom.x, geom.y] };
+  }
+  if (geomType === 'esriGeometryPolyline') {
+    const p = geom.paths || [];
+    if (!p.length) return null;
+    return p.length === 1 ? { type:'LineString', coordinates:p[0] }
+                          : { type:'MultiLineString', coordinates:p };
+  }
+  if (geomType === 'esriGeometryPolygon') {
+    const rings = geom.rings || [];
+    if (!rings.length) return null;
+    if (rings.length === 1) return { type:'Polygon', coordinates:rings };
+    // outer ring = largest absolute area
+    const sorted = rings.map(r => ({ r, a: signedArea(r) }))
+                        .sort((a, b) => Math.abs(b.a) - Math.abs(a.a));
+    // ArcGIS: outer rings clockwise (area < 0), holes CCW (area > 0)
+    const outers = sorted.filter(x => x.a <= 0).map(x => x.r);
+    const holes  = sorted.filter(x => x.a >  0).map(x => x.r);
+    if (!outers.length) return { type:'Polygon', coordinates:[sorted[0].r] };
+    if (outers.length === 1) return { type:'Polygon', coordinates:[outers[0], ...holes] };
+    return { type:'MultiPolygon', coordinates: outers.map(r => [r]) };
+  }
+  return null;
 }
 
-async function fetchAllFromSource(src, progOffset, progRange) {
+// ── Logging ───────────────────────────────────────────────────────────────────
+const logEl = () => document.getElementById('log');
+function appendLog(msg) {
+  logEl().textContent += msg + '\n';
+  logEl().scrollTop = logEl().scrollHeight;
+}
+function clearLog() { logEl().textContent = ''; logEl().className = ''; }
+
+// ── Download one service ──────────────────────────────────────────────────────
+async function downloadService(svc, progStart, progEnd) {
   const prog = document.getElementById('prog');
-  const testUrl = src.base.replace('/query', '') + '?f=json';
 
-  // Obține total count
-  const countData = await apiFetch(src.base + '?where=1%3D1&returnCountOnly=true&f=json');
-  const total = countData.count ?? '?';
-  log(`  [${src.label}] Total features: ${total}`);
+  // Layer metadata (geometryType)
+  appendLog(`[${svc.label}] Obtin metadata...`);
+  const meta = await jsonp(svc.url + '?f=json');
+  const geomType = meta.geometryType || 'esriGeometryPolygon';
+  appendLog(`[${svc.label}] Tip geom: ${geomType}`);
 
-  // Obține toate ID-urile
-  const idsData = await apiFetch(src.base + '?where=1%3D1&returnIdsOnly=true&f=json');
-  const allIds = (idsData.objectIds || []).sort((a, b) => a - b);
-  log(`  [${src.label}] ID-uri obținute: ${allIds.length}`);
+  // Total count
+  const cntData = await jsonp(svc.url + '/query?where=1%3D1&returnCountOnly=true&f=json');
+  const total = cntData.count ?? '?';
+  appendLog(`[${svc.label}] Features în serviciu: ${total}`);
+
+  // All objectIds
+  const idsData = await jsonp(svc.url + '/query?where=1%3D1&returnIdsOnly=true&f=json');
+  const ids = (idsData.objectIds || []).sort((a, b) => a - b);
+  appendLog(`[${svc.label}] ID-uri obținute: ${ids.length}`);
 
   const features = [];
-  const totalBatches = Math.ceil(allIds.length / BATCH);
+  const nBatches = Math.ceil(ids.length / BATCH);
 
-  for (let i = 0; i < allIds.length; i += BATCH) {
-    const batch = allIds.slice(i, i + BATCH);
-    const batchNum = Math.floor(i / BATCH) + 1;
-    prog.value = progOffset + Math.round((i / allIds.length) * progRange);
-    log(`  [${src.label}] Lot ${batchNum}/${totalBatches} — features: ${features.length}`);
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const bn = Math.floor(i / BATCH) + 1;
+    prog.value = progStart + Math.round((i / Math.max(ids.length, 1)) * (progEnd - progStart));
+    appendLog(`[${svc.label}] Lot ${bn}/${nBatches}  feat: ${features.length}`);
 
-    const params = new URLSearchParams({
-      objectIds: batch.join(','),
-      outFields: '*',
-      returnGeometry: 'true',
-      geometryPrecision: '6',
-      f: 'geojson',
-    });
-    const data = await apiFetch(src.base + '?' + params);
-    for (const f of (data.features || [])) {
-      if (f.geometry?.type && f.geometry?.coordinates?.length) features.push(f);
+    const qs = 'objectIds=' + batch.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&f=json';
+    const data = await jsonp(svc.url + '/query?' + qs);
+
+    for (const feat of (data.features || [])) {
+      const geom = esriGeomToGeoJSON(feat.geometry, geomType);
+      if (!geom) continue;
+      features.push({ type:'Feature', geometry:geom, properties:feat.attributes || {} });
     }
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 80));
   }
 
-  log(`  [${src.label}] ✓ ${features.length} features descărcate`);
+  appendLog(`[${svc.label}] ✓ ${features.length} features OK`);
   return features;
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 async function startDownload() {
   const btn = document.getElementById('btn');
   const prog = document.getElementById('prog');
   btn.disabled = true;
-  logLines = [];
+  clearLog();
   prog.value = 0;
-  document.getElementById('status').className = 'run';
+  appendLog('Start descărcare...\n');
 
-  // Test conexiune
-  log('Testez conexiunea la gis.cjgorj.ro...');
-  try {
-    await apiFetch(SOURCES[0].base + '?where=1%3D1&returnCountOnly=true&f=json');
-    useProxy = false;
-    log('Conexiune directă OK.');
-  } catch(e) {
-    log('CORS blocat — încerc prin proxy...');
-    useProxy = true;
-    try {
-      await apiFetch(SOURCES[0].base + '?where=1%3D1&returnCountOnly=true&f=json');
-      log('Conexiune prin proxy OK.');
-    } catch(e2) {
-      setErr('Eroare conexiune:\n' + e2.message + '\n\nVerifică că ești conectat la internet și că gis.cjgorj.ro este accesibil.');
-      btn.disabled = false; return;
-    }
-  }
-
-  // Descarcă din ambele surse
-  let featSrc1 = [], featSrc2 = [];
+  let f1 = [], f2 = [];
 
   try {
-    log('\n--- Sursă 1: MapServer/0 ---');
-    featSrc1 = await fetchAllFromSource(SOURCES[0], 0, 45);
+    f1 = await downloadService(SERVICES[0], 0, 45);
   } catch(e) {
-    log(`  [MapServer/0] Eroare: ${e.message}`);
+    appendLog('MapServer/0 EROARE: ' + e.message);
   }
+
+  appendLog('');
 
   try {
-    log('\n--- Sursă 2: FeatureServer/3 ---');
-    featSrc2 = await fetchAllFromSource(SOURCES[1], 45, 45);
+    f2 = await downloadService(SERVICES[1], 45, 90);
   } catch(e) {
-    log(`  [FeatureServer/3] Eroare: ${e.message}`);
+    appendLog('FeatureServer/3 EROARE: ' + e.message);
   }
 
-  // Îmbinare — deduplicare pe objectid dacă există în ambele
-  log('\nÎmbin și deduplicez features...');
+  // Merge + dedup pe objectId numeric
+  appendLog('\nÎmbin features...');
   const seen = new Set();
   const merged = [];
-
-  for (const f of featSrc1) {
-    const id = f.properties?.objectid ?? f.properties?.OBJECTID ?? f.id;
-    const key = `ms0_${id}`;
-    if (!seen.has(key)) { seen.add(key); merged.push(f); }
+  for (const f of f1) {
+    const id = 'ms_' + (f.properties?.OBJECTID ?? f.properties?.objectid ?? merged.length);
+    if (!seen.has(id)) { seen.add(id); merged.push(f); }
   }
-  for (const f of featSrc2) {
-    // FeatureServer poate avea aceleași objectId-uri — le tratăm separat
-    const id = f.properties?.objectid ?? f.properties?.OBJECTID ?? f.id;
-    const key = `fs3_${id}`;
-    if (!seen.has(key)) { seen.add(key); merged.push(f); }
+  for (const f of f2) {
+    const id = 'fs_' + (f.properties?.OBJECTID ?? f.properties?.objectid ?? merged.length);
+    if (!seen.has(id)) { seen.add(id); merged.push(f); }
   }
+  appendLog(`Total: ${merged.length} features (MS/0: ${f1.length} + FS/3: ${f2.length})`);
 
-  log(`Total merged: ${merged.length} features (${featSrc1.length} din MS/0 + ${featSrc2.length} din FS/3)`);
-
-  if (merged.length === 0) {
-    setErr('Niciun feature descărcat din nicio sursă.');
+  if (!merged.length) {
+    logEl().className = 'err';
+    appendLog('\nNiciun feature descărcat!');
     btn.disabled = false; return;
   }
 
-  // Conversie FGB
+  // FGB serialize
   prog.value = 95;
-  log('Convertesc în FlatGeobuf...');
+  appendLog('Convertesc în FlatGeobuf...');
   await new Promise(r => setTimeout(r, 50));
 
-  let fgb;
-  try {
-    fgb = flatgeobuf.serialize({ type: 'FeatureCollection', features: merged });
-  } catch(e) {
-    setErr('Eroare serializare FGB:\n' + e.message);
-    btn.disabled = false; return;
-  }
-
-  prog.value = 100;
+  const fgb = flatgeobuf.serialize({ type:'FeatureCollection', features:merged });
   const sizeMB = (fgb.byteLength / 1024 / 1024).toFixed(1);
+  prog.value = 100;
 
-  const blob = new Blob([fgb]);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob([fgb]));
   a.download = 'PUG.fgb';
   a.click();
 
-  document.getElementById('status').className = 'ok';
-  log(`\n✓ PUG.fgb descărcat — ${merged.length} features, ${sizeMB} MB`);
-  log('Trimite fișierul PUG.fgb în sesiunea Claude pentru a-l urca în repository.');
+  logEl().className = 'ok';
+  appendLog(`\n✓ PUG.fgb descărcat — ${merged.length} features, ${sizeMB} MB`);
+  appendLog('Trimite fișierul PUG.fgb în sesiunea Claude.');
   btn.disabled = false;
 }
 </script>
