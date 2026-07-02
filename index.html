@@ -307,6 +307,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .leaflet-measure-resultpopup{background:var(--panel)!important;border-color:var(--border)!important;color:var(--text)!important}
 .meas-live-tip{background:rgba(30,30,30,.88)!important;border:1px solid rgba(255,235,59,.5)!important;color:#ffeb3b!important;font-size:12px!important;font-weight:600!important;padding:3px 8px!important;border-radius:4px!important;white-space:nowrap!important;pointer-events:none!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important}
 .meas-live-tip::before{border-right-color:rgba(255,235,59,.5)!important}
+.osm-addr-nr{background:rgba(10,26,48,.88);color:#00e5ff;font-size:10px;font-weight:700;
+  padding:1px 4px;border-radius:3px;border:1px solid #00bcd4;white-space:nowrap;
+  pointer-events:none;line-height:1.3;display:inline-block}
+.osm-addr-tip.leaflet-tooltip{background:var(--panel)!important;border-color:var(--border)!important;
+  color:var(--text)!important;font-size:11px!important;padding:3px 7px!important}
 </style>
 </head>
 <body>
@@ -1684,6 +1689,57 @@ async function loadStaticLayers() {
   createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb', { _withLabels: true });
   createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
   createFgbLayer('static_uat_gorj',    'Limite UAT Gorj', '#e74c3c', 'DATA/UAT_GORJ.fgb', { minZoom:8, _withLabels:true, _labelField:'name', _labelMinZoom:9 });
+
+  // ── Nomenclatură Stradală OSM (Overpass, dinamic la zoom ≥ 15) ──────────
+  (function() {
+    const addrGroup = L.layerGroup();
+    const layerObj = {
+      id: 'osm_adrese', name: 'Nomenclatură Stradală (OSM)',
+      cat: 'cadastru', color: '#00bcd4', format: 'OSM',
+      geojson: { type:'FeatureCollection', features:[] },
+      visible: false, static: true, leafletLayer: addrGroup,
+    };
+    let _lastBbox = null, _busy = false;
+
+    async function refreshOverpass() {
+      if (!layerObj.visible) return;
+      if (map.getZoom() < 15) { addrGroup.clearLayers(); _lastBbox = null; return; }
+      const b = map.getBounds();
+      const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => v.toFixed(5)).join(',');
+      if (bbox === _lastBbox || _busy) return;
+      _lastBbox = bbox;
+      _busy = true;
+      try {
+        const q = `[out:json][timeout:30][bbox:${bbox}];(node["addr:housenumber"];way["addr:housenumber"];);out center qt;`;
+        const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data='+encodeURIComponent(q) });
+        if (!r.ok) throw new Error(r.status);
+        const data = await r.json();
+        addrGroup.clearLayers();
+        for (const el of (data.elements || [])) {
+          const lat = el.lat ?? el.center?.lat;
+          const lon = el.lon ?? el.center?.lon;
+          const nr = el.tags?.['addr:housenumber'];
+          if (!lat || !lon || !nr) continue;
+          const strada = el.tags?.['addr:street'] || '';
+          L.marker([lat, lon], {
+            icon: L.divIcon({ className:'osm-addr-icon', html:`<span class="osm-addr-nr">${nr}</span>`, iconSize:null, iconAnchor:[0,0] }),
+            interactive: true,
+          }).bindTooltip((strada ? strada + ' nr. ' : '') + nr,
+            { direction:'top', offset:[0,-6], className:'osm-addr-tip' })
+            .addTo(addrGroup);
+        }
+      } catch(e) { console.warn('Overpass addr:', e); }
+      _busy = false;
+    }
+
+    // Trigger refresh când layerul e activat
+    const _origAddTo = addrGroup.addTo.bind(addrGroup);
+    addrGroup.addTo = function(m) { _origAddTo(m); refreshOverpass(); return addrGroup; };
+
+    layers.push(layerObj);
+    renderTree();
+    map.on('moveend zoomend', refreshOverpass);
+  })();
 
   // ── Rețele Transport (ordinea: TRANSELECTRICA, TRANSGAZ, ROMGAZ, OMV, CONPET) ──
   createFgbLayer('static_conpet',        'CONPET',         '#6c3483', 'DATA/CONPET.fgb',        { cat:'transport', minZoom:9 });
