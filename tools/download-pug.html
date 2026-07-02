@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Descarcă PUG complet de pe gis.cjgorj.ro</title>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<style>
+  body { font-family: sans-serif; max-width: 620px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  h2 { color: #7ec8e3; }
+  p { color: #aaa; font-size: 14px; line-height: 1.6; }
+  button { padding: 12px 28px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 16px; }
+  button:disabled { background: #555; cursor: not-allowed; }
+  #status { margin-top: 20px; padding: 14px; border-radius: 6px; background: #0f3460; font-size: 13px; min-height: 60px; white-space: pre-wrap; line-height: 1.7; }
+  #status.ok  { border-left: 4px solid #2ecc71; }
+  #status.err { border-left: 4px solid #e74c3c; }
+  #status.run { border-left: 4px solid #f39c12; }
+  progress { width: 100%; height: 10px; margin-top: 12px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h2>Descarcă PUG complet (gis.cjgorj.ro)</h2>
+<p>
+  Descarcă toate feature-urile PUG de pe serverul ArcGIS al CJ Gorj cu paginare completă,
+  le convertește în FlatGeobuf și le salvează ca <strong>PUG.fgb</strong>.
+  Înlocuiți fișierul existent din <code>DATA/PUG.fgb</code> cu cel descărcat.
+</p>
+<button id="btn" onclick="startDownload()">▶ Descarcă PUG.fgb complet</button>
+<progress id="prog" value="0" max="100" style="display:none"></progress>
+<div id="status">Apasă butonul pentru a începe descărcarea.</div>
+
+<script>
+const BASE_URL = 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0/query';
+const PROXY    = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
+const PAGE_SIZE = 2000;
+
+function buildUrl(offset, useProxy) {
+  const params = new URLSearchParams({
+    where: '1=1',
+    outFields: '*',
+    returnGeometry: 'true',
+    geometryPrecision: '6',
+    f: 'geojson',
+    resultOffset: String(offset),
+    resultRecordCount: String(PAGE_SIZE),
+  });
+  const direct = BASE_URL + '?' + params.toString();
+  return useProxy ? PROXY + encodeURIComponent(direct) : direct;
+}
+
+async function fetchPage(offset, useProxy) {
+  const url = buildUrl(offset, useProxy);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} la offset ${offset}`);
+  return resp.json();
+}
+
+async function startDownload() {
+  const btn = document.getElementById('btn');
+  const status = document.getElementById('status');
+  const prog = document.getElementById('prog');
+  btn.disabled = true;
+  prog.style.display = 'block';
+  prog.value = 0;
+  status.className = 'run';
+
+  const allFeatures = [];
+  let offset = 0;
+  let page = 1;
+  let useProxy = false;
+
+  // test CORS – încearcă direct, dacă eșuează folosește proxy
+  status.textContent = 'Testez conexiunea la gis.cjgorj.ro...';
+  try {
+    await fetchPage(0, false);
+  } catch(e) {
+    status.textContent = 'CORS blocat, folosesc proxy...';
+    useProxy = true;
+  }
+
+  try {
+    while (true) {
+      status.textContent = `Descărcare pagina ${page} (offset ${offset})...\nFeatures colectate: ${allFeatures.length}`;
+      const data = await fetchPage(offset, useProxy);
+
+      if (!data.features || data.features.length === 0) break;
+
+      for (const f of data.features) {
+        if (f.geometry?.type && Array.isArray(f.geometry?.coordinates)) {
+          allFeatures.push(f);
+        }
+      }
+
+      prog.value = Math.min(99, Math.round((allFeatures.length / 25000) * 99));
+      status.textContent = `Descărcare pagina ${page} ✓\nFeatures colectate: ${allFeatures.length}`;
+
+      if (!data.exceededTransferLimit) break; // ultima pagina
+      offset += PAGE_SIZE;
+      page++;
+      await new Promise(r => setTimeout(r, 200)); // pauza între pagini
+    }
+  } catch(e) {
+    status.className = 'err';
+    status.textContent = 'Eroare la descărcare:\n' + e.message;
+    btn.disabled = false;
+    return;
+  }
+
+  if (allFeatures.length === 0) {
+    status.className = 'err';
+    status.textContent = 'Niciun feature descărcat. Verifică conexiunea sau serverul.';
+    btn.disabled = false;
+    return;
+  }
+
+  status.textContent = `Convertesc ${allFeatures.length} features în FlatGeobuf...`;
+  prog.value = 99;
+
+  let fgb;
+  try {
+    await new Promise(r => setTimeout(r, 40));
+    fgb = flatgeobuf.serialize({ type: 'FeatureCollection', features: allFeatures });
+  } catch(e) {
+    status.className = 'err';
+    status.textContent = 'Eroare la serializare FGB:\n' + e.message;
+    btn.disabled = false;
+    return;
+  }
+
+  prog.value = 100;
+  const sizeMB = (fgb.byteLength / 1024 / 1024).toFixed(1);
+
+  const blob = new Blob([fgb]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'PUG.fgb';
+  a.click();
+
+  status.className = 'ok';
+  status.textContent = `✓ Descărcat: PUG.fgb\nFeatures totale: ${allFeatures.length}\nDimensiune: ${sizeMB} MB\n\nÎnlocuiește DATA/PUG.fgb din repository cu acest fișier.`;
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
