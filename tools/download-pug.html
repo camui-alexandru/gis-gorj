@@ -5,186 +5,197 @@
 <title>Descarcă PUG complet — gis.cjgorj.ro</title>
 <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
 <style>
-  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
-  h2 { color: #7ec8e3; }
-  p  { color: #aaa; font-size: 14px; line-height: 1.6; }
+  body { font-family: sans-serif; max-width: 660px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  h2 { color: #7ec8e3; margin-bottom: 6px; }
+  p  { color: #aaa; font-size: 13px; line-height: 1.6; margin: 6px 0; }
   button { padding: 12px 28px; background: #8e44ad; color: #fff; border: none; border-radius: 6px;
-           cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 8px; }
-  button:disabled { background: #555; cursor: not-allowed; }
-  #status { margin-top: 20px; padding: 14px; border-radius: 6px; background: #0f3460;
-            font-size: 13px; min-height: 60px; white-space: pre-wrap; line-height: 1.8; }
+           cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 12px; }
+  button:disabled { background: #444; cursor: not-allowed; }
+  #status { margin-top: 16px; padding: 14px; border-radius: 6px; background: #0f3460;
+            font-size: 13px; min-height: 80px; white-space: pre-wrap; line-height: 1.8; }
   #status.ok  { border-left: 4px solid #2ecc71; }
   #status.err { border-left: 4px solid #e74c3c; }
   #status.run { border-left: 4px solid #f39c12; }
-  progress { width: 100%; height: 12px; margin-top: 12px; border-radius: 4px; display:none; }
+  progress { width: 100%; height: 12px; margin-top: 10px; border-radius: 4px; }
+  .src { background:#0a1f3d; border-radius:6px; padding:10px 14px; margin:8px 0; font-size:12px; color:#7ec8e3; }
 </style>
 </head>
 <body>
 <h2>Descarcă PUG.fgb complet</h2>
-<p>
-  Obține mai întâi lista completă de ID-uri de la ArcGIS, apoi descarcă features în loturi.
-  Această metodă garantează că niciun feature nu este omis, indiferent de limita serverului.
-</p>
-<p>Selectează stratul de descărcat:</p>
-<select id="layerSel" style="padding:8px;background:#0f3460;color:#eee;border:1px solid #7ec8e3;border-radius:6px;font-size:14px;width:100%">
-  <option value="0">Layer 0 — PUG (zone urbanism)</option>
-  <option value="1">Layer 1 — Zone Protecție</option>
-  <option value="2">Layer 2 — PUZ</option>
-</select>
-<br>
-<button id="btn" onclick="startDownload()">▶ Descarcă complet</button>
+
+<div class="src">📡 Sursă 1 — MapServer/0:<br>gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0</div>
+<div class="src">📡 Sursă 2 — FeatureServer/3:<br>gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3</div>
+
+<p>Descarcă toate features din ambele surse (folosind returnIdsOnly pentru completitudine), le îmbină și exportă un singur <strong>PUG.fgb</strong>.</p>
+
+<button id="btn" onclick="startDownload()">▶ Descarcă PUG.fgb complet</button>
 <progress id="prog" value="0" max="100"></progress>
 <div id="status">Apasă butonul pentru a începe.</div>
 
 <script>
-const SERVER = 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer';
-const PROXY  = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
-const BATCH  = 500; // features per request (conservativ)
+const SOURCES = [
+  { label: 'MapServer/0',    base: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0/query' },
+  { label: 'FeatureServer/3', base: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3/query' },
+];
+const PROXY = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
+const BATCH = 500;
 
 let useProxy = false;
+let logLines = [];
 
-function url(layerId, params) {
-  const base = `${SERVER}/${layerId}/query?${new URLSearchParams(params)}`;
-  return useProxy ? PROXY + encodeURIComponent(base) : base;
+function log(msg) {
+  logLines.push(msg);
+  document.getElementById('status').textContent = logLines.slice(-12).join('\n');
 }
 
-async function apiFetch(layerId, params) {
-  const resp = await fetch(url(layerId, params));
+function setErr(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'err';
+}
+
+async function apiFetch(queryUrl) {
+  const target = useProxy ? PROXY + encodeURIComponent(queryUrl) : queryUrl;
+  const resp = await fetch(target);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const data = await resp.json();
-  if (data.error) throw new Error(`ArcGIS error ${data.error.code}: ${data.error.message}`);
+  if (data.error) throw new Error(`ArcGIS ${data.error.code}: ${data.error.message}`);
   return data;
 }
 
-function setStatus(msg, cls) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = cls || '';
+async function fetchAllFromSource(src, progOffset, progRange) {
+  const prog = document.getElementById('prog');
+  const testUrl = src.base.replace('/query', '') + '?f=json';
+
+  // Obține total count
+  const countData = await apiFetch(src.base + '?where=1%3D1&returnCountOnly=true&f=json');
+  const total = countData.count ?? '?';
+  log(`  [${src.label}] Total features: ${total}`);
+
+  // Obține toate ID-urile
+  const idsData = await apiFetch(src.base + '?where=1%3D1&returnIdsOnly=true&f=json');
+  const allIds = (idsData.objectIds || []).sort((a, b) => a - b);
+  log(`  [${src.label}] ID-uri obținute: ${allIds.length}`);
+
+  const features = [];
+  const totalBatches = Math.ceil(allIds.length / BATCH);
+
+  for (let i = 0; i < allIds.length; i += BATCH) {
+    const batch = allIds.slice(i, i + BATCH);
+    const batchNum = Math.floor(i / BATCH) + 1;
+    prog.value = progOffset + Math.round((i / allIds.length) * progRange);
+    log(`  [${src.label}] Lot ${batchNum}/${totalBatches} — features: ${features.length}`);
+
+    const params = new URLSearchParams({
+      objectIds: batch.join(','),
+      outFields: '*',
+      returnGeometry: 'true',
+      geometryPrecision: '6',
+      f: 'geojson',
+    });
+    const data = await apiFetch(src.base + '?' + params);
+    for (const f of (data.features || [])) {
+      if (f.geometry?.type && f.geometry?.coordinates?.length) features.push(f);
+    }
+    await new Promise(r => setTimeout(r, 120));
+  }
+
+  log(`  [${src.label}] ✓ ${features.length} features descărcate`);
+  return features;
 }
 
 async function startDownload() {
   const btn = document.getElementById('btn');
   const prog = document.getElementById('prog');
-  const layerId = document.getElementById('layerSel').value;
   btn.disabled = true;
-  prog.style.display = 'block';
+  logLines = [];
   prog.value = 0;
+  document.getElementById('status').className = 'run';
 
-  // 1. Test CORS
-  setStatus('Testez conexiunea...', 'run');
+  // Test conexiune
+  log('Testez conexiunea la gis.cjgorj.ro...');
   try {
-    await apiFetch(layerId, { where:'1=1', returnCountOnly:'true', f:'json' });
+    await apiFetch(SOURCES[0].base + '?where=1%3D1&returnCountOnly=true&f=json');
     useProxy = false;
+    log('Conexiune directă OK.');
   } catch(e) {
-    setStatus('CORS blocat, încerc prin proxy...', 'run');
+    log('CORS blocat — încerc prin proxy...');
     useProxy = true;
     try {
-      await apiFetch(layerId, { where:'1=1', returnCountOnly:'true', f:'json' });
+      await apiFetch(SOURCES[0].base + '?where=1%3D1&returnCountOnly=true&f=json');
+      log('Conexiune prin proxy OK.');
     } catch(e2) {
-      setStatus('Eroare conexiune:\n' + e2.message, 'err');
+      setErr('Eroare conexiune:\n' + e2.message + '\n\nVerifică că ești conectat la internet și că gis.cjgorj.ro este accesibil.');
       btn.disabled = false; return;
     }
   }
 
-  // 2. Obține totalul de features
-  let totalCount;
+  // Descarcă din ambele surse
+  let featSrc1 = [], featSrc2 = [];
+
   try {
-    const countResp = await apiFetch(layerId, { where:'1=1', returnCountOnly:'true', f:'json' });
-    totalCount = countResp.count;
-    setStatus(`Total features în serviciu: ${totalCount}\nObttin lista de ID-uri...`, 'run');
+    log('\n--- Sursă 1: MapServer/0 ---');
+    featSrc1 = await fetchAllFromSource(SOURCES[0], 0, 45);
   } catch(e) {
-    setStatus('Eroare la obținerea numărului de features:\n' + e.message, 'err');
-    btn.disabled = false; return;
+    log(`  [MapServer/0] Eroare: ${e.message}`);
   }
 
-  // 3. Obține TOATE objectId-urile
-  let allIds;
   try {
-    const idsResp = await apiFetch(layerId, { where:'1=1', returnIdsOnly:'true', f:'json' });
-    allIds = idsResp.objectIds || [];
-    allIds.sort((a, b) => a - b);
-    setStatus(`Total ID-uri obținute: ${allIds.length} / ${totalCount}\nÎncep descărcarea features...`, 'run');
+    log('\n--- Sursă 2: FeatureServer/3 ---');
+    featSrc2 = await fetchAllFromSource(SOURCES[1], 45, 45);
   } catch(e) {
-    setStatus('Eroare la obținerea ID-urilor:\n' + e.message, 'err');
+    log(`  [FeatureServer/3] Eroare: ${e.message}`);
+  }
+
+  // Îmbinare — deduplicare pe objectid dacă există în ambele
+  log('\nÎmbin și deduplicez features...');
+  const seen = new Set();
+  const merged = [];
+
+  for (const f of featSrc1) {
+    const id = f.properties?.objectid ?? f.properties?.OBJECTID ?? f.id;
+    const key = `ms0_${id}`;
+    if (!seen.has(key)) { seen.add(key); merged.push(f); }
+  }
+  for (const f of featSrc2) {
+    // FeatureServer poate avea aceleași objectId-uri — le tratăm separat
+    const id = f.properties?.objectid ?? f.properties?.OBJECTID ?? f.id;
+    const key = `fs3_${id}`;
+    if (!seen.has(key)) { seen.add(key); merged.push(f); }
+  }
+
+  log(`Total merged: ${merged.length} features (${featSrc1.length} din MS/0 + ${featSrc2.length} din FS/3)`);
+
+  if (merged.length === 0) {
+    setErr('Niciun feature descărcat din nicio sursă.');
     btn.disabled = false; return;
   }
 
-  if (allIds.length === 0) {
-    setStatus('Niciun ID returnat de server.', 'err');
-    btn.disabled = false; return;
-  }
-
-  // 4. Descarcă features în loturi după objectId
-  const allFeatures = [];
-  const oidField = 'OBJECTID'; // ArcGIS standard
-  const totalBatches = Math.ceil(allIds.length / BATCH);
-
-  for (let i = 0; i < allIds.length; i += BATCH) {
-    const batchIds = allIds.slice(i, i + BATCH);
-    const batchNum = Math.floor(i / BATCH) + 1;
-    const pct = Math.round((i / allIds.length) * 95);
-    prog.value = pct;
-    setStatus(
-      `Lot ${batchNum}/${totalBatches} (ID ${batchIds[0]}–${batchIds[batchIds.length-1]})\n` +
-      `Features colectate: ${allFeatures.length} / ${allIds.length}`,
-      'run'
-    );
-
-    try {
-      const data = await apiFetch(layerId, {
-        objectIds: batchIds.join(','),
-        outFields: '*',
-        returnGeometry: 'true',
-        geometryPrecision: '6',
-        f: 'geojson',
-      });
-      for (const f of (data.features || [])) {
-        if (f.geometry?.type && f.geometry?.coordinates?.length) {
-          allFeatures.push(f);
-        }
-      }
-    } catch(e) {
-      setStatus(`Eroare la lotul ${batchNum}:\n` + e.message, 'err');
-      btn.disabled = false; return;
-    }
-
-    // pauza scurtă pentru a nu supraîncărca serverul
-    await new Promise(r => setTimeout(r, 150));
-  }
-
-  // 5. Conversie FGB
-  prog.value = 97;
-  setStatus(`Convertesc ${allFeatures.length} features în FlatGeobuf...`, 'run');
+  // Conversie FGB
+  prog.value = 95;
+  log('Convertesc în FlatGeobuf...');
   await new Promise(r => setTimeout(r, 50));
 
   let fgb;
   try {
-    fgb = flatgeobuf.serialize({ type: 'FeatureCollection', features: allFeatures });
+    fgb = flatgeobuf.serialize({ type: 'FeatureCollection', features: merged });
   } catch(e) {
-    setStatus('Eroare la serializare FGB:\n' + e.message, 'err');
+    setErr('Eroare serializare FGB:\n' + e.message);
     btn.disabled = false; return;
   }
 
   prog.value = 100;
   const sizeMB = (fgb.byteLength / 1024 / 1024).toFixed(1);
 
-  const layerNames = { '0':'PUG', '1':'ZoneProtectie', '2':'PUZ' };
-  const outName = (layerNames[layerId] || `layer${layerId}`) + '.fgb';
-
   const blob = new Blob([fgb]);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = outName;
+  a.download = 'PUG.fgb';
   a.click();
 
-  setStatus(
-    `✓ Descărcat: ${outName}\n` +
-    `ID-uri în serviciu: ${allIds.length}\n` +
-    `Features cu geometrie validă: ${allFeatures.length}\n` +
-    `Dimensiune: ${sizeMB} MB\n\n` +
-    `Înlocuiește DATA/${outName} din repository cu acest fișier.`,
-    'ok'
-  );
+  document.getElementById('status').className = 'ok';
+  log(`\n✓ PUG.fgb descărcat — ${merged.length} features, ${sizeMB} MB`);
+  log('Trimite fișierul PUG.fgb în sesiunea Claude pentru a-l urca în repository.');
   btn.disabled = false;
 }
 </script>
