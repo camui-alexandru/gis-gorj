@@ -1690,7 +1690,7 @@ async function loadStaticLayers() {
   createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
   createFgbLayer('static_uat_gorj',    'Limite UAT Gorj', '#e74c3c', 'DATA/UAT_GORJ.fgb', { minZoom:8, _withLabels:true, _labelField:'name', _labelMinZoom:9 });
 
-  // ── Nomenclatură Stradală OSM (Overpass, dinamic la zoom ≥ 15) ──────────
+  // ── Nomenclatură Stradală OSM (Overpass, dinamic la zoom ≥ 14) ──────────
   (function() {
     const addrGroup = L.layerGroup();
     const layerObj = {
@@ -1699,21 +1699,22 @@ async function loadStaticLayers() {
       geojson: { type:'FeatureCollection', features:[] },
       visible: false, static: true, leafletLayer: addrGroup,
     };
-    let _lastBbox = null, _busy = false;
+    let _busy = false;
 
     async function refreshOverpass() {
       if (!layerObj.visible) return;
-      if (map.getZoom() < 15) { addrGroup.clearLayers(); _lastBbox = null; return; }
+      if (map.getZoom() < 14) { addrGroup.clearLayers(); return; }
+      if (_busy) return;
+      _busy = true;
       const b = map.getBounds();
       const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => v.toFixed(5)).join(',');
-      if (bbox === _lastBbox || _busy) return;
-      _lastBbox = bbox;
-      _busy = true;
       try {
         const q = `[out:json][timeout:30][bbox:${bbox}];(node["addr:housenumber"];way["addr:housenumber"];);out center qt;`;
+        console.log('[OSM addr] query bbox:', bbox);
         const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data='+encodeURIComponent(q) });
-        if (!r.ok) throw new Error(r.status);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
+        console.log('[OSM addr] elemente:', data.elements?.length ?? 0);
         addrGroup.clearLayers();
         for (const el of (data.elements || [])) {
           const lat = el.lat ?? el.center?.lat;
@@ -1721,24 +1722,35 @@ async function loadStaticLayers() {
           const nr = el.tags?.['addr:housenumber'];
           if (!lat || !lon || !nr) continue;
           const strada = el.tags?.['addr:street'] || '';
+          const tip = (strada ? strada + ' nr. ' : '') + nr;
           L.marker([lat, lon], {
-            icon: L.divIcon({ className:'osm-addr-icon', html:`<span class="osm-addr-nr">${nr}</span>`, iconSize:null, iconAnchor:[0,0] }),
-            interactive: true,
-          }).bindTooltip((strada ? strada + ' nr. ' : '') + nr,
-            { direction:'top', offset:[0,-6], className:'osm-addr-tip' })
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="background:rgba(5,15,30,.9);color:#00e5ff;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;border:1px solid #00bcd4;white-space:nowrap;line-height:1.4;pointer-events:none">${nr}</div>`,
+              iconSize: null, iconAnchor: [0, 8],
+            }),
+            interactive: false,
+            zIndexOffset: 500,
+          }).bindTooltip(tip, { direction:'top', offset:[0,-4], className:'osm-addr-tip' })
             .addTo(addrGroup);
         }
-      } catch(e) { console.warn('Overpass addr:', e); }
-      _busy = false;
+      } catch(e) {
+        console.error('[OSM addr] eroare:', e);
+      } finally {
+        _busy = false;
+      }
     }
-
-    // Trigger refresh când layerul e activat
-    const _origAddTo = addrGroup.addTo.bind(addrGroup);
-    addrGroup.addTo = function(m) { _origAddTo(m); refreshOverpass(); return addrGroup; };
 
     layers.push(layerObj);
     renderTree();
     map.on('moveend zoomend', refreshOverpass);
+
+    // Declanșează refresh la activare
+    const _origToggle = window.toggleLayer;
+    window.toggleLayer = function(id) {
+      _origToggle(id);
+      if (id === 'osm_adrese' && layerObj.visible) refreshOverpass();
+    };
   })();
 
   // ── Rețele Transport (ordinea: TRANSELECTRICA, TRANSGAZ, ROMGAZ, OMV, CONPET) ──
