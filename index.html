@@ -1119,10 +1119,14 @@ function showAttr(feature, layer) {
     const _pug = v => (v && v.toLowerCase() !== 'selectati') ? v : '';
     const utrAfisare = _a('utr_afisare');
     let utrPug = _pug(_a('utr_pug')) || _pug(_a('den_regulament'));
-    // Fallback: construiește zona din utr + utr_afisare când utr_pug lipsește
-    if (!utrPug && utrAfisare) {
+    // Fallback: construiește zona din utr + utr_afisare (sau tip) când utr_pug lipsește
+    if (!utrPug) {
+      const TIP_ZONE = {'L1':'lr','L2':'lr','M':'m','M1':'m1','M2':'m2','M3':'m3',
+        'IS':'is','I':'i','C':'c','DS':'ds','G1':'g1','G2':'g2',
+        'V':'v','V1':'v1','A':'a','Ccr':'ccr','Cca':'cca','Ccf':'ccf','Ccn':'ccn','CCN':'ccn'};
+      const zoneSlug = (utrAfisare || TIP_ZONE[_a('tip')] || '').toLowerCase().replace(/[^a-z0-9]/g,'');
       const uatSlug = _a('utr').split(/[_\s\-]+/)[0].toLowerCase().replace(/[^a-z]/g,'');
-      if (uatSlug) utrPug = uatSlug + '_' + utrAfisare.toLowerCase().replace(/[^a-z0-9]/g,'');
+      if (uatSlug && zoneSlug) utrPug = uatSlug + '_' + zoneSlug;
     }
     const utr       = _a('utr');
     document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
@@ -1824,6 +1828,7 @@ const ArcGISDynamic = L.Layer.extend({
   window.loadRegimTehnic = function(utrPug) {
     const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
       '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
+    const htmlUrl = 'https://gis.cjgorj.ro/urbanism/PUG_ZONE_INFO.jsp?zona=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
@@ -1907,7 +1912,7 @@ const ArcGISDynamic = L.Layer.extend({
         '.fw iframe{width:100%;height:100%;border:none;filter:invert(0.88) hue-rotate(180deg) contrast(0.85);background:#fff}' +
         '</style></head><body>' +
         '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
-        '<div class="fw"><iframe src="' + xmlUrl + '"></iframe></div></body></html>');
+        '<div class="fw"><iframe src="' + htmlUrl + '"></iframe></div></body></html>');
       w.document.close();
     }
 
