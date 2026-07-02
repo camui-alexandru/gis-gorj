@@ -1599,12 +1599,12 @@ async function refreshFgbLayers() {
       try {
         const features = [];
         if (l._noIndex) {
-          // Fișiere fără index spațial: stream complet cu world-rect, cache features cu envelope
+          // Fișiere fără index spațial: citire completă din buffer, cache features cu envelope
           if (!l._cachedFeatures) {
             l._cachedFeatures = [];
-            const resp = await fetch(l.fgbUrl);
-            const WORLD = { minX:-180, minY:-90, maxX:180, maxY:90 };
-            for await (const f of flatgeobuf.deserialize(resp.body, WORLD)) {
+            const buf = await getFgbBuffer(l.fgbUrl);
+            const fc = flatgeobuf.deserialize(buf);
+            for (const f of (fc.features || [])) {
               if (f.geometry?.coordinates) f._env = calcEnvelope(f.geometry.coordinates);
               l._cachedFeatures.push(f);
             }
