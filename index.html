@@ -1810,6 +1810,9 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Straturi Urbanism — locale FGB ────────
 (function() {
+  // Alunecări de Teren (primul = apare ultimul în meniu din cauza reverse())
+  createFgbLayer('static_alunecari', 'Alunecări de Teren', '#e67e22',
+    'DATA/AlunecariTeren.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   // Zone Protecție
   createFgbLayer('static_zone_protectie', 'Zone Protecție', '#795548',
     'DATA/ZoneProtectie.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
@@ -1822,9 +1825,6 @@ const ArcGISDynamic = L.Layer.extend({
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
-  // Alunecări de Teren
-  createFgbLayer('static_alunecari', 'Alunecări de Teren', '#e67e22',
-    'DATA/AlunecariTeren.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   renderTree();
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
