@@ -545,7 +545,7 @@ function rgbaToHex([r,g,b,a=255]) {
   if (a === 0) return 'transparent';
   return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }
-function rendererStyle(renderer, feature, hovered) {
+function rendererStyle(renderer, feature, hovered, opacityMult = 1) {
   const props = feature.properties || {};
   // filtrare date de test (ex: "CRASNA - test", "CRASNA-test")
   if (/[-\s]test\b/i.test(String(props.utr_afisare || ''))) {
@@ -564,9 +564,9 @@ function rendererStyle(renderer, feature, hovered) {
   return {
     color:       stroke === 'transparent' ? 'transparent' : stroke,
     weight:      hovered ? 2.5 : 1,
-    opacity:     stroke === 'transparent' ? 0 : 0.9,
+    opacity:     stroke === 'transparent' ? 0 : 0.9 * opacityMult,
     fillColor:   fill,
-    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA),
+    fillOpacity: fill === 'transparent' ? 0 : (hovered ? Math.min(fillA + 0.15, 1) : fillA) * opacityMult,
   };
 }
 
@@ -1042,7 +1042,10 @@ function setLayerOpacity(id, opacity, slider) {
   if (!layer) return;
   layer._opacity = opacity;
   if (layer.leafletLayer) {
-    if (typeof layer.leafletLayer.setOpacity === 'function') {
+    const rdr = layer._renderer;
+    if (rdr && typeof layer.leafletLayer.setStyle === 'function') {
+      layer.leafletLayer.setStyle(f => rendererStyle(rdr, f, false, opacity));
+    } else if (typeof layer.leafletLayer.setOpacity === 'function') {
       layer.leafletLayer.setOpacity(opacity);
     } else if (typeof layer.leafletLayer.setStyle === 'function') {
       layer.leafletLayer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.3 });
@@ -1113,8 +1116,18 @@ function showAttr(feature, layer) {
   // Mod PUG: afișaj special cu regim tehnic
   if (layer._isPug) {
     const _a = name => { const lc = name.toLowerCase(); for (const k in props) { if (k.toLowerCase() === lc) { const v = props[k]; if (v != null && String(v).trim() && String(v).trim().toLowerCase() !== 'null') return String(v).trim(); } } return ''; };
+    const _pug = v => (v && v.toLowerCase() !== 'selectati') ? v : '';
     const utrAfisare = _a('utr_afisare');
-    const utrPug    = _a('utr_pug') || _a('den_regulament');
+    let utrPug = _pug(_a('utr_pug')) || _pug(_a('den_regulament'));
+    // Fallback: construiește zona din utr + utr_afisare (sau tip) când utr_pug lipsește
+    if (!utrPug) {
+      const TIP_ZONE = {'L1':'lr','L2':'lr','M':'m','M1':'m1','M2':'m2','M3':'m3',
+        'IS':'is','I':'i','C':'c','DS':'ds','G1':'g1','G2':'g2',
+        'V':'v','V1':'v1','A':'a','Ccr':'ccr','Cca':'cca','Ccf':'ccf','Ccn':'ccn','CCN':'ccn'};
+      const zoneSlug = (utrAfisare || TIP_ZONE[_a('tip')] || '').toLowerCase().replace(/[^a-z0-9_]/g,'');
+      const uatSlug = _a('utr').split(/[_\s\-]+/)[0].toLowerCase().replace(/[^a-z]/g,'');
+      if (uatSlug && zoneSlug) utrPug = uatSlug + '_' + zoneSlug;
+    }
     const utr       = _a('utr');
     document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
     document.getElementById('attrLayerName').textContent = utrAfisare || layer.name;
@@ -1511,19 +1524,21 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
   opts = opts || {};
   const rdr = opts._renderer || null;
   const style = rdr
-    ? f => rendererStyle(rdr, f, false)
-    : () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
+    ? f => rendererStyle(rdr, f, false, FGB_LAYERS[id]?._opacity ?? 1)
+    : () => { const op = FGB_LAYERS[id]?._opacity ?? 1; return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
-      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
-      else this.setStyle && this.setStyle({ weight:2.5, opacity:1, fillOpacity:.5 });
+      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true, op));
+      else this.setStyle && this.setStyle({ weight:2.5, opacity:op, fillOpacity:op * 0.5 });
     });
     lyr.on('mouseout', function() {
       if (activeTool !== 'pan') return;
-      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
-      else this.setStyle && this.setStyle({ weight:1.2, opacity:.9, fillOpacity:.3 });
+      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false, op));
+      else this.setStyle && this.setStyle({ weight:1.2, opacity:op * 0.9, fillOpacity:op * 0.3 });
     });
   };
 
@@ -1633,10 +1648,11 @@ async function refreshFgbLayers() {
           const TIP_PRIORITY = {
             'UAT':0, '-//-':1, 'Extravilan':1, 'EX1':1, 'TE':2, 'V2':2,
             'A':3, 'S':3, 'V':4, 'V1':4, 'G1':4, 'G2':4,
-            'TAI':5, 'L1':6, 'L2':6, 'M':6, 'M1':6, 'M2':6, 'M3':6,
-            'C':7, 'IS':7, 'I':7, 'DS':7, 'Alte UTR-uri':7,
-            'Cca':8, 'Ccf':8, 'Ccn':8, 'CCN':8, 'Ccr':8,
-            'Zona cai de comunicatie rutiera si amenajari aferente':8,
+            'TAI':5,
+            'Cca':6, 'Ccf':6, 'Ccn':6, 'CCN':6, 'Ccr':6,
+            'Zona cai de comunicatie rutiera si amenajari aferente':6,
+            'L1':7, 'L2':7, 'M':7, 'M1':7, 'M2':7, 'M3':7,
+            'C':8, 'IS':8, 'I':8, 'DS':8, 'Alte UTR-uri':8,
           };
           features.sort((a, b) => {
             const pa = TIP_PRIORITY[a.properties?.tip] ?? 5;
@@ -1812,6 +1828,7 @@ const ArcGISDynamic = L.Layer.extend({
   window.loadRegimTehnic = function(utrPug) {
     const xmlUrl = 'https://gis.cjgorj.ro/urbanism/pageForRequest/getXMLContent.jsp' +
       '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
+    const htmlUrl = 'https://gis.cjgorj.ro/urbanism/PUG_ZONE_INFO.jsp?zona=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
 
     const CSS =
@@ -1890,12 +1907,12 @@ const ArcGISDynamic = L.Layer.extend({
     function openFallback(w) {
       w.document.open();
       w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
-        label + '</title><style>' + CSS +
-        '.fw{height:calc(100vh - 50px);background:#1a1f2e}' +
-        '.fw iframe{width:100%;height:100%;border:none;filter:invert(0.88) hue-rotate(180deg) contrast(0.85);background:#fff}' +
-        '</style></head><body>' +
+        label + '</title><style>' + CSS + '</style></head><body>' +
         '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
-        '<div class="fw"><iframe src="' + xmlUrl + '"></iframe></div></body></html>');
+        '<div class="bd"><p style="color:#94a3b8;margin-top:24px">Regulamentul nu este disponibil în format text structurat pentru această zonă.</p>' +
+        '<p style="margin-top:16px"><a href="' + htmlUrl + '" target="_blank" ' +
+        'style="color:#38bdf8;font-size:14px">↗ Deschide regulamentul pe gis.cjgorj.ro</a></p>' +
+        '</div></body></html>');
       w.document.close();
     }
 
