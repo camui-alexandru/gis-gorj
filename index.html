@@ -1905,7 +1905,15 @@ const ArcGISDynamic = L.Layer.extend({
     }
 
     function openFallback(w) {
-      w.location.href = htmlUrl;
+      w.document.open();
+      w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
+        label + '</title><style>' + CSS + '</style></head><body>' +
+        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
+        '<div class="bd"><p style="color:#94a3b8;margin-top:24px">Regulamentul nu este disponibil în format text structurat pentru această zonă.</p>' +
+        '<p style="margin-top:16px"><a href="' + htmlUrl + '" target="_blank" ' +
+        'style="color:#38bdf8;font-size:14px">↗ Deschide regulamentul pe gis.cjgorj.ro</a></p>' +
+        '</div></body></html>');
+      w.document.close();
     }
 
     var w = window.open('','_blank','width=960,height=750,scrollbars=yes,resizable=yes');
