@@ -128,7 +128,7 @@ async function downloadService(svc, progStart, progEnd) {
     prog.value = progStart + Math.round((i / Math.max(ids.length, 1)) * (progEnd - progStart));
     appendLog(`[${svc.label}] Lot ${bn}/${nBatches}  feat: ${features.length}`);
 
-    const qs = 'objectIds=' + batch.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&f=json';
+    const qs = 'objectIds=' + batch.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&outSR=4326&f=json';
 
     // Retry cu dimensiune lot din ce în ce mai mică la eșec
     let fetched = false;
@@ -138,7 +138,7 @@ async function downloadService(svc, progStart, progEnd) {
       for (let c = 0; c < batch.length; c += chunkSize) chunks.push(batch.slice(c, c + chunkSize));
       let chunkFail = 0;
       for (const chunk of chunks) {
-        const qsC = 'objectIds=' + chunk.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&f=json';
+        const qsC = 'objectIds=' + chunk.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&outSR=4326&f=json';
         let data = null;
         for (let attempt = 1; attempt <= 2; attempt++) {
           try { data = await jsonp(svc.url + '/query?' + qsC); break; }
