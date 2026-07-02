@@ -32,10 +32,12 @@ const SERVICES = [
   { label: 'MapServer/0',     url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/MapServer/0' },
   { label: 'FeatureServer/3', url: 'https://gis.cjgorj.ro/server/rest/services/FIDA/PUG/FeatureServer/3' },
 ];
-const BATCH = 250; // features per JSONP request (conservativ)
+const BATCH = 250;
+// Proxy-ul CJ Gorj adaugă token-ul de autentificare automat
+const PROXY = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
 
-// ── JSONP helper ──────────────────────────────────────────────────────────────
-function jsonp(url) {
+// ── JSONP prin proxy (bypass CORS + autentificare) ────────────────────────────
+function jsonp(targetUrl) {
   return new Promise((resolve, reject) => {
     const cbName = '_jcb' + Date.now() + Math.floor(Math.random() * 99999);
     const script = document.createElement('script');
@@ -46,8 +48,10 @@ function jsonp(url) {
       if (data && data.error) reject(new Error('ArcGIS ' + data.error.code + ': ' + data.error.message));
       else resolve(data);
     };
-    script.onerror = () => { cleanup(); reject(new Error('Eroare JSONP: ' + url.slice(0, 80))); };
-    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+    script.onerror = () => { cleanup(); reject(new Error('JSONP eșuat')); };
+    // Adaugă callback la URL-ul țintă și rutează prin proxy
+    const sep = targetUrl.includes('?') ? '&' : '?';
+    script.src = PROXY + targetUrl + sep + 'callback=' + cbName;
     document.head.appendChild(script);
   });
 }
