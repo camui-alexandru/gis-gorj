@@ -1514,8 +1514,8 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
   opts = opts || {};
   const rdr = opts._renderer || null;
   const style = rdr
-    ? f => rendererStyle(rdr, f, false)
-    : () => ({ color, weight:1.2, opacity:.9, fillOpacity:.3, fillColor:color });
+    ? f => rendererStyle(rdr, f, false, FGB_LAYERS[id]?._opacity ?? 1)
+    : () => { const op = FGB_LAYERS[id]?._opacity ?? 1; return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
     lyr.on('mouseover', function() {
