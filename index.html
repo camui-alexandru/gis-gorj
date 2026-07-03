@@ -1558,6 +1558,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     _renderer: rdr,
     _isPug: opts._isPug || false,
     _noIndex: opts._noIndex || false,
+    _opacity: opts._opacity ?? 1,
     leafletLayer: geoLayer,
     fgbUrl
   };
@@ -1822,7 +1823,7 @@ const ArcGISDynamic = L.Layer.extend({
     'DATA/PUZ.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   // PUG — cu renderer autentic și afișaj special
   createFgbLayer('static_pug', 'PUG', '#e74c3c',
-    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true, _noIndex:true });
+    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true, _noIndex:true, _opacity: 0.5 });
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
