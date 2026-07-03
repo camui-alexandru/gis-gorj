@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Download Monumente Istorice OSM — GIS Gorj</title>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
 <style>
 :root{--bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;--accent:#2a7fff;--text:#d8e4f0;--muted:#5a7090;--green:#2ecc71;--red:#e74c3c;--orange:#e8a838}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -203,19 +204,8 @@ window.startFetch = async function() {
   setprog(75);
   log('Serializare FlatGeobuf…', 'info');
 
-  // Import flatgeobuf
-  let serialize;
   try {
-    const mod = await import('https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js');
-    serialize = mod.serialize;
-  } catch(e) {
-    log('EROARE import flatgeobuf: ' + e.message, 'err');
-    document.getElementById('btnFetch').disabled = false;
-    return;
-  }
-
-  try {
-    fgbBytes = serialize(geojson);
+    fgbBytes = flatgeobuf.serialize(geojson);
   } catch(e) {
     log('EROARE serializare FGB: ' + e.message, 'err');
     document.getElementById('btnFetch').disabled = false;
