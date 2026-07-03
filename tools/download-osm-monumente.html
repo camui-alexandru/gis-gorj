@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Download Monumente Istorice OSM — GIS Gorj</title>
+<style>
+:root{--bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;--accent:#2a7fff;--text:#d8e4f0;--muted:#5a7090;--green:#2ecc71;--red:#e74c3c;--orange:#e8a838}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);padding:24px;min-height:100vh}
+h1{font-size:17px;font-weight:700;margin-bottom:4px}
+.sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px}
+.card h2{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.btn{background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#1a6fef}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-dl{background:#1a8a6a}
+.btn-dl:hover{background:#147a5a}
+.log{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:10px 12px;font-family:monospace;font-size:11px;min-height:80px;max-height:260px;overflow-y:auto;white-space:pre-wrap;line-height:1.6}
+.log .ok{color:var(--green)}
+.log .err{color:var(--red)}
+.log .warn{color:var(--orange)}
+.log .info{color:var(--accent)}
+.stat{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}
+.stat-item{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;text-align:center}
+.stat-item .val{font-size:20px;font-weight:800;color:var(--accent)}
+.stat-item .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+progress{width:100%;height:6px;border-radius:3px;margin-top:10px;appearance:none;-webkit-appearance:none}
+progress::-webkit-progress-bar{background:var(--border);border-radius:3px}
+progress::-webkit-progress-value{background:var(--accent);border-radius:3px;transition:width .3s}
+progress::-moz-progress-bar{background:var(--accent);border-radius:3px}
+.tag-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.tag-table th{text-align:left;padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border)}
+.tag-table td{padding:4px 8px;border-bottom:1px solid #0d1828;color:var(--text)}
+.tag-table tr:hover td{background:var(--panel2)}
+.pill{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;color:#fff;margin:1px}
+</style>
+</head>
+<body>
+<h1>🏛 Download Monumente Istorice (OSM) — Gorj</h1>
+<div class="sub">Preia date OSM din Overpass API și exportă ca MonumenteOSM.fgb pentru GIS Gorj</div>
+
+<div class="card">
+  <h2>Parametri interogare</h2>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+    Sursa: <strong style="color:var(--text)">OpenStreetMap via Overpass API</strong><br>
+    Zona: <strong style="color:var(--text)">Județul Gorj (admin_level=4)</strong><br>
+    Tag-uri: <span class="pill" style="background:#c0392b">historic=*</span>
+              <span class="pill" style="background:#8e44ad">heritage=*</span>
+              <span class="pill" style="background:#16a085">ref:ro:lmi=*</span>
+  </div>
+  <button class="btn" id="btnFetch" onclick="startFetch()">▶ Pornește descărcarea</button>
+  <progress id="prog" value="0" max="100" style="display:none"></progress>
+</div>
+
+<div class="card">
+  <h2>Log</h2>
+  <div class="log" id="log">Apasă „Pornește descărcarea" pentru a începe…</div>
+  <div class="stat" id="statBox" style="display:none">
+    <div class="stat-item"><div class="val" id="statTotal">0</div><div class="lbl">Total features</div></div>
+    <div class="stat-item"><div class="val" id="statNodes">0</div><div class="lbl">Puncte</div></div>
+    <div class="stat-item"><div class="val" id="statWays">0</div><div class="lbl">Poligoane</div></div>
+    <div class="stat-item"><div class="val" id="statSize">—</div><div class="lbl">Dimensiune FGB</div></div>
+  </div>
+</div>
+
+<div class="card" id="cardBreakdown" style="display:none">
+  <h2>Repartizare tip monument</h2>
+  <table class="tag-table">
+    <thead><tr><th>Tip (historic=)</th><th>Număr</th></tr></thead>
+    <tbody id="breakdownBody"></tbody>
+  </table>
+</div>
+
+<div class="card" id="cardDl" style="display:none">
+  <h2>Export</h2>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+    Descarcă fișierul și încarcă-l în repository la <strong>DATA/MonumenteOSM.fgb</strong>
+  </p>
+  <button class="btn btn-dl" id="btnDl" onclick="doDownload()">⬇ Descarcă MonumenteOSM.fgb</button>
+</div>
+
+<script type="module">
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+
+// Query: historic OR heritage OR ref:ro:lmi în județul Gorj
+const QUERY = `[out:json][timeout:120];
+area["name"="Gorj"]["admin_level"="4"]->.gorj;
+(
+  node["historic"](area.gorj);
+  way["historic"](area.gorj);
+  node["heritage"](area.gorj);
+  way["heritage"](area.gorj);
+  node["ref:ro:lmi"](area.gorj);
+  way["ref:ro:lmi"](area.gorj);
+);
+out geom;`;
+
+let fgbBytes = null;
+const logEl = document.getElementById('log');
+const prog = document.getElementById('prog');
+
+function log(msg, cls='') {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setprog(v) { prog.value = v; }
+
+function osmToGeoJSON(elements) {
+  const seen = new Set();
+  const features = [];
+  for (const el of elements) {
+    const key = el.type + el.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    let geometry = null;
+    if (el.type === 'node' && el.lat !== undefined) {
+      geometry = { type: 'Point', coordinates: [el.lon, el.lat] };
+    } else if (el.type === 'way' && el.geometry && el.geometry.length > 0) {
+      const coords = el.geometry.map(p => [p.lon, p.lat]);
+      const closed = coords.length >= 4 &&
+        coords[0][0] === coords[coords.length - 1][0] &&
+        coords[0][1] === coords[coords.length - 1][1];
+      geometry = closed
+        ? { type: 'Polygon', coordinates: [coords] }
+        : { type: 'LineString', coordinates: coords };
+    }
+    if (!geometry) continue;
+
+    const props = Object.assign({}, el.tags || {}, {
+      osm_id: String(el.id),
+      osm_type: el.type
+    });
+
+    // Normalizează câmpuri importante
+    if (!props.name && props['name:ro']) props.name = props['name:ro'];
+    if (props['addr:street']) props.adresa = (props['addr:street'] || '') + ' ' + (props['addr:housenumber'] || '');
+
+    features.push({ type: 'Feature', geometry, properties: props });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+window.startFetch = async function() {
+  logEl.innerHTML = '';
+  fgbBytes = null;
+  document.getElementById('statBox').style.display = 'none';
+  document.getElementById('cardBreakdown').style.display = 'none';
+  document.getElementById('cardDl').style.display = 'none';
+  prog.style.display = 'block';
+  prog.value = 0;
+  document.getElementById('btnFetch').disabled = true;
+
+  log('Trimitere interogare Overpass API…', 'info');
+  setprog(10);
+
+  let json;
+  try {
+    const resp = await fetch(OVERPASS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'data=' + encodeURIComponent(QUERY)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    setprog(50);
+    log('Răspuns primit, procesare date…', 'info');
+    json = await resp.json();
+  } catch(e) {
+    log('EROARE fetch Overpass: ' + e.message, 'err');
+    document.getElementById('btnFetch').disabled = false;
+    return;
+  }
+
+  const elements = json.elements || [];
+  log(`OSM elements brute: ${elements.length}`, 'ok');
+  setprog(65);
+
+  const geojson = osmToGeoJSON(elements);
+  const n = geojson.features.length;
+  log(`Features GeoJSON: ${n}`, 'ok');
+
+  if (n === 0) {
+    log('Nu s-au găsit monumente! Verifică zona sau query-ul.', 'warn');
+    document.getElementById('btnFetch').disabled = false;
+    return;
+  }
+
+  // Statistici tip
+  const byType = {};
+  let nodes = 0, ways = 0;
+  for (const f of geojson.features) {
+    const t = f.properties.historic || f.properties.heritage || '(necunoscut)';
+    byType[t] = (byType[t] || 0) + 1;
+    if (f.geometry.type === 'Point') nodes++;
+    else ways++;
+  }
+
+  setprog(75);
+  log('Serializare FlatGeobuf…', 'info');
+
+  // Import flatgeobuf
+  let serialize;
+  try {
+    const mod = await import('https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js');
+    serialize = mod.serialize;
+  } catch(e) {
+    log('EROARE import flatgeobuf: ' + e.message, 'err');
+    document.getElementById('btnFetch').disabled = false;
+    return;
+  }
+
+  try {
+    fgbBytes = serialize(geojson);
+  } catch(e) {
+    log('EROARE serializare FGB: ' + e.message, 'err');
+    document.getElementById('btnFetch').disabled = false;
+    return;
+  }
+
+  setprog(100);
+  const sizeKB = (fgbBytes.byteLength / 1024).toFixed(1);
+  log(`FGB generat: ${sizeKB} KB`, 'ok');
+  log('Gata! Descarcă fișierul și încarcă-l în DATA/MonumenteOSM.fgb', 'ok');
+
+  // Actualizare UI statistici
+  document.getElementById('statTotal').textContent = n;
+  document.getElementById('statNodes').textContent = nodes;
+  document.getElementById('statWays').textContent = ways;
+  document.getElementById('statSize').textContent = sizeKB + ' KB';
+  document.getElementById('statBox').style.display = 'flex';
+
+  // Tabel breakdown
+  const tbody = document.getElementById('breakdownBody');
+  tbody.innerHTML = Object.entries(byType)
+    .sort((a,b) => b[1]-a[1])
+    .map(([t,c]) => `<tr><td>${t}</td><td>${c}</td></tr>`)
+    .join('');
+  document.getElementById('cardBreakdown').style.display = 'block';
+  document.getElementById('cardDl').style.display = 'block';
+  document.getElementById('btnFetch').disabled = false;
+};
+
+window.doDownload = function() {
+  if (!fgbBytes) return;
+  const blob = new Blob([fgbBytes], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'MonumenteOSM.fgb';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+</script>
+</body>
+</html>

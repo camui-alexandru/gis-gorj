@@ -524,6 +524,7 @@ const CATEGORIES = [
   { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
   { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
   { id:'proiecte',  icon:'📐', label:'Proiecte',                 color:'#ff7043' },
+  { id:'patrimoniu', icon:'🏛', label:'Patrimoniu & Monumente',  color:'#c0392b' },
   { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
 
@@ -1841,6 +1842,14 @@ const ArcGISDynamic = L.Layer.extend({
     }
   });
   layers.push(deoLayer);
+  renderTree();
+})();
+
+// ── Straturi Patrimoniu — locale FGB ────────
+(function() {
+  // Monumente Istorice (OSM) — primul = apare ultimul în meniu
+  createFgbLayer('static_monumente', 'Monumente Istorice (OSM)', '#c0392b',
+    'DATA/MonumenteOSM.fgb', { cat:'patrimoniu', minZoom:9, _noIndex:true });
   renderTree();
 })();
 
