@@ -1042,7 +1042,11 @@ function setLayerOpacity(id, opacity, slider) {
   const layer = layers.find(l => l.id === id) || FGB_LAYERS[id];
   if (!layer) return;
   layer._opacity = opacity;
-  if (layer.leafletLayer) {
+  if (layer._pane) {
+    // Pane dedicat: opacity prin CSS, fără stacking per-feature
+    const pane = map.getPane(layer._pane);
+    if (pane) pane.style.opacity = String(opacity);
+  } else if (layer.leafletLayer) {
     const rdr = layer._renderer;
     if (rdr && typeof layer.leafletLayer.setStyle === 'function') {
       layer.leafletLayer.setStyle(f => rendererStyle(rdr, f, false, opacity));
@@ -1524,26 +1528,33 @@ async function loadCadSearchIndex() {
 function createFgbLayer(id, name, color, fgbUrl, opts) {
   opts = opts || {};
   const rdr = opts._renderer || null;
+  // Dacă layerul folosește un pane dedicat, opacity e pe pane (CSS), nu per-feature
+  const hasPane = !!opts._pane;
+  if (hasPane && !map.getPane(opts._pane)) {
+    map.createPane(opts._pane);
+    map.getPane(opts._pane).style.zIndex = 401;
+    map.getPane(opts._pane).style.opacity = String(opts._opacity ?? 1);
+  }
   const style = rdr
-    ? f => rendererStyle(rdr, f, false, FGB_LAYERS[id]?._opacity ?? 1)
-    : () => { const op = FGB_LAYERS[id]?._opacity ?? 1; return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
+    ? f => rendererStyle(rdr, f, false, hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1))
+    : () => { const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1); return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
   const onEach = (f, lyr) => {
     lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
-      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1);
       if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true, op));
       else this.setStyle && this.setStyle({ weight:2.5, opacity:op, fillOpacity:op * 0.5 });
     });
     lyr.on('mouseout', function() {
       if (activeTool !== 'pan') return;
-      const op = FGB_LAYERS[id]?._opacity ?? 1;
+      const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1);
       if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false, op));
       else this.setStyle && this.setStyle({ weight:1.2, opacity:op * 0.9, fillOpacity:op * 0.3 });
     });
   };
 
-  const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach });
+  const geoLayer = L.geoJSON(null, { style, onEachFeature: onEach, pane: opts._pane || undefined });
 
   const layerObj = {
     id, name, cat: opts.cat || 'cadastru', color, format:'SHP',
@@ -1559,6 +1570,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     _isPug: opts._isPug || false,
     _noIndex: opts._noIndex || false,
     _opacity: opts._opacity ?? 1,
+    _pane: opts._pane || null,
     leafletLayer: geoLayer,
     fgbUrl
   };
@@ -1823,7 +1835,7 @@ const ArcGISDynamic = L.Layer.extend({
     'DATA/PUZ.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
   // PUG — cu renderer autentic și afișaj special
   createFgbLayer('static_pug', 'PUG', '#e74c3c',
-    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true, _noIndex:true, _opacity: 0.5 });
+    'DATA/PUG.fgb', { cat:'urbanism', minZoom:11, _renderer: PUG_RENDERER, _isPug: true, _noIndex:true, _opacity: 0.5, _pane: 'pugPane' });
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
@@ -1914,10 +1926,8 @@ const ArcGISDynamic = L.Layer.extend({
       w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
         label + '</title><style>' + CSS + '</style></head><body>' +
         '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
-        '<div class="bd"><p style="color:#94a3b8;margin-top:24px">Regulamentul nu este disponibil în format text structurat pentru această zonă.</p>' +
-        '<p style="margin-top:16px"><a href="' + htmlUrl + '" target="_blank" ' +
-        'style="color:#38bdf8;font-size:14px">↗ Deschide regulamentul pe gis.cjgorj.ro</a></p>' +
-        '</div></body></html>');
+        '<div class="fw"><iframe src="' + htmlUrl + '"></iframe></div>' +
+        '</body></html>');
       w.document.close();
     }
 
