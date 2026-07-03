@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GIS Gorj — Autentificare</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<style>
+:root{
+  --bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;
+  --accent:#2a7fff;--accent2:#1db8c2;--text:#d8e4f0;--muted:#5a7090;
+  --green:#2ecc71;--red:#e74c3c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+
+/* ── BACKGROUND GRID ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(42,127,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(42,127,255,.04) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none
+}
+
+/* ── CARD ── */
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  width:100%;max-width:400px;padding:36px 32px;box-shadow:0 24px 64px rgba(0,0,0,.6);
+  position:relative;z-index:1
+}
+
+/* ── BRAND ── */
+.brand{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:32px}
+.brand .logo-wrap{
+  width:64px;height:64px;background:linear-gradient(135deg,#0d1e35,#1a3055);
+  border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center
+}
+.brand svg{width:44px;height:44px}
+.brand h1{font-size:20px;font-weight:800;text-align:center;letter-spacing:.3px}
+.brand h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:3px;letter-spacing:.5px}
+
+/* ── FORM ── */
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:6px;display:block}
+.form-group{margin-bottom:18px}
+.input-wrap{position:relative}
+.input-wrap input{
+  width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:10px 12px 10px 38px;color:var(--text);font-size:14px;outline:none;
+  transition:.15s;font-family:inherit
+}
+.input-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(42,127,255,.12)}
+.input-wrap input::placeholder{color:var(--muted)}
+.input-wrap .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--muted);pointer-events:none}
+
+.show-pw{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;line-height:1}
+.show-pw:hover{color:var(--text)}
+
+/* ── REMEMBER ── */
+.remember{display:flex;align-items:center;gap:8px;margin-bottom:22px;cursor:pointer;user-select:none}
+.remember input[type=checkbox]{
+  appearance:none;-webkit-appearance:none;width:16px;height:16px;
+  border:1px solid var(--border);border-radius:4px;background:var(--bg);
+  cursor:pointer;flex-shrink:0;position:relative;transition:.15s
+}
+.remember input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.remember input[type=checkbox]:checked::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
+.remember span{font-size:13px;color:var(--muted)}
+
+/* ── BUTTON ── */
+.btn-login{
+  width:100%;background:var(--accent);color:#fff;border:none;border-radius:7px;
+  padding:11px;font-size:14px;font-weight:700;cursor:pointer;
+  transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-family:inherit;letter-spacing:.3px
+}
+.btn-login:hover{background:#1a6fef}
+.btn-login:active{transform:scale(.98)}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* ── ERROR ── */
+.err{
+  background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.3);
+  border-radius:6px;padding:9px 12px;font-size:13px;color:#ff8a8a;
+  margin-bottom:18px;display:none;align-items:center;gap:8px
+}
+.err.visible{display:flex}
+
+/* ── FOOTER ── */
+.login-footer{margin-top:28px;text-align:center;font-size:11px;color:var(--muted)}
+.login-footer a{color:var(--accent);text-decoration:none}
+.login-footer a:hover{text-decoration:underline}
+
+/* ── SPINNER ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 100 100" fill="var(--accent)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round">
+        <path d="M44.7,82.5 L44.3,83.4 L45.2,84.5 L43.8,83.5 L43.4,84.2 L42.4,82.7 L40.4,81.8 L39.3,80.5 L39.3,78.4 L38.6,78.8 L38.2,77.8 L35.0,76.5 L34.1,72.0 L31.8,70.4 L30.8,72.3 L29.8,69.5 L30.8,69.1 L30.3,68.0 L27.9,67.0 L26.5,63.2 L27.1,62.5 L26.6,61.5 L27.0,59.3 L25.0,50.0 L27.1,49.5 L26.5,48.1 L27.3,46.3 L23.5,46.1 L23.6,45.4 L22.0,42.1 L18.6,39.7 L17.5,37.8 L15.3,38.1 L15.2,36.9 L14.3,36.9 L14.9,36.1 L14.4,35.7 L12.8,37.0 L11.7,33.0 L9.2,32.0 L8.7,29.7 L3.5,28.3 L2.0,26.0 L3.2,22.8 L5.1,20.1 L8.5,18.3 L8.4,16.7 L10.5,15.9 L11.5,13.7 L11.9,14.5 L12.4,13.4 L15.1,14.3 L15.7,12.9 L18.0,12.2 L18.7,13.2 L20.9,12.0 L21.6,10.4 L24.1,11.5 L24.6,13.3 L28.5,11.1 L31.4,11.8 L28.9,15.7 L30.4,16.1 L31.4,12.1 L32.0,12.1 L32.8,14.2 L34.4,13.4 L35.2,14.3 L39.6,12.9 L39.7,11.7 L41.6,9.6 L45.4,11.1 L45.7,10.2 L46.9,11.1 L48.3,10.3 L50.0,11.4 L52.0,8.2 L56.0,7.4 L57.6,8.6 L58.9,7.4 L59.8,4.7 L62.4,4.7 L62.8,3.8 L64.5,4.3 L64.3,6.6 L67.5,8.9 L69.6,8.2 L70.5,6.8 L74.1,4.9 L74.6,3.7 L77.8,2.1 L80.8,4.4 L82.5,2.4 L85.4,5.1 L87.1,4.4 L88.5,5.2 L93.6,2.0 L97.1,4.8 L97.2,6.7 L93.6,13.3 L95.2,19.9 L96.8,21.8 L98.0,26.8 L94.8,29.9 L95.6,31.1 L95.7,32.4 L95.2,32.8 L96.0,34.2 L96.0,36.1 L92.6,37.5 L93.5,42.4 L90.8,44.6 L90.6,45.8 L91.8,51.4 L91.3,54.4 L91.6,56.5 L90.9,57.6 L91.2,59.3 L90.4,61.1 L91.6,61.0 L91.6,61.8 L92.4,62.1 L92.5,65.0 L93.6,67.7 L91.7,72.0 L92.5,74.7 L92.4,80.2 L90.0,80.0 L88.1,78.3 L87.7,78.9 L87.4,80.6 L88.4,83.9 L87.1,87.0 L87.6,88.0 L87.1,89.0 L88.0,90.8 L87.3,93.0 L87.7,94.4 L87.3,95.8 L86.3,93.9 L80.2,95.4 L78.3,92.3 L72.8,94.0 L72.3,96.2 L71.2,96.7 L71.5,97.7 L69.5,96.7 L68.6,97.3 L69.2,98.0 L67.8,97.8 L66.1,96.4 L66.1,95.6 L64.5,95.3 L65.2,92.9 L63.2,91.7 L63.8,90.6 L61.1,90.5 L58.3,88.3 L58.0,86.6 L56.0,84.8 L55.0,85.8 L53.0,85.6 L48.4,84.5 L48.8,82.6 L45.5,83.3Z"/>
+      </svg>
+    </div>
+    <h1>GIS Gorj <small>Portal Cartografic Județean</small></h1>
+  </div>
+
+  <div class="err" id="errMsg">⚠ <span id="errText">Utilizator sau parolă incorectă.</span></div>
+
+  <form id="loginForm" onsubmit="handleLogin(event)" autocomplete="on">
+    <div class="form-group">
+      <label class="form-label" for="username">Utilizator</label>
+      <div class="input-wrap">
+        <span class="icon">👤</span>
+        <input type="text" id="username" name="username" placeholder="Introduceți utilizatorul" autocomplete="username" required/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="password">Parolă</label>
+      <div class="input-wrap">
+        <span class="icon">🔒</span>
+        <input type="password" id="password" name="password" placeholder="Introduceți parola" autocomplete="current-password" required/>
+        <button type="button" class="show-pw" id="showPwBtn" onclick="togglePw()" title="Arată/ascunde parola">👁</button>
+      </div>
+    </div>
+    <label class="remember">
+      <input type="checkbox" id="rememberMe"/>
+      <span>Ține-mă conectat (persistent între sesiuni)</span>
+    </label>
+    <button type="submit" class="btn-login" id="loginBtn">
+      <span id="btnLabel">Autentificare</span>
+    </button>
+  </form>
+
+  <div class="login-footer">
+    Platformă GIS internă — Consiliul Județean Gorj
+  </div>
+</div>
+
+<script>
+/* ── USER DATABASE ──────────────────────────────────────────────────────
+   Passwords are stored as SHA-256 hex hashes.
+   To change a password, compute: echo -n "parola" | sha256sum
+   and replace the hash below.
+─────────────────────────────────────────────────────────────────────── */
+const GIS_USERS = {
+  'admin':    { hash: 'd0693099842f1f0146cb91e65dcb07f59e13766fb45777e410fb68c41d7b7685', name: 'Administrator' },
+  'gorj':     { hash: 'd0693099842f1f0146cb91e65dcb07f59e13766fb45777e410fb68c41d7b7685', name: 'Utilizator Gorj' },
+};
+// Default password for all accounts above: gorj2024
+
+const AUTH_KEY = 'gis_gorj_auth';
+const AUTH_USER_KEY = 'gis_gorj_user';
+
+/* Redirect if already logged in */
+(function checkAlreadyLoggedIn() {
+  const stored = sessionStorage.getItem(AUTH_KEY) || localStorage.getItem(AUTH_KEY);
+  if (stored === 'ok') {
+    location.replace('index.html');
+  }
+})();
+
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function togglePw() {
+  const pw = document.getElementById('password');
+  const btn = document.getElementById('showPwBtn');
+  if (pw.type === 'password') { pw.type = 'text'; btn.textContent = '🙈'; }
+  else { pw.type = 'password'; btn.textContent = '👁'; }
+}
+
+function showError(msg) {
+  const err = document.getElementById('errMsg');
+  document.getElementById('errText').textContent = msg;
+  err.classList.add('visible');
+  document.getElementById('loginBtn').disabled = false;
+  document.getElementById('btnLabel').textContent = 'Autentificare';
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const label = document.getElementById('btnLabel');
+  const err = document.getElementById('errMsg');
+  err.classList.remove('visible');
+
+  const username = document.getElementById('username').value.trim().toLowerCase();
+  const password = document.getElementById('password').value;
+  const remember = document.getElementById('rememberMe').checked;
+
+  if (!username || !password) { showError('Completați utilizatorul și parola.'); return; }
+
+  btn.disabled = true;
+  label.innerHTML = '<div class="spinner"></div>';
+
+  const user = GIS_USERS[username];
+  if (!user) {
+    await new Promise(r => setTimeout(r, 600)); // prevent timing attacks
+    showError('Utilizator sau parolă incorectă.');
+    return;
+  }
+
+  const hash = await sha256hex(password);
+  if (hash !== user.hash) {
+    await new Promise(r => setTimeout(r, 600));
+    showError('Utilizator sau parolă incorectă.');
+    return;
+  }
+
+  // Successful login
+  const storage = remember ? localStorage : sessionStorage;
+  storage.setItem(AUTH_KEY, 'ok');
+  storage.setItem(AUTH_USER_KEY, JSON.stringify({ username, name: user.name }));
+
+  label.textContent = '✓ Succes!';
+  setTimeout(() => location.replace('index.html'), 300);
+}
+</script>
+</body>
+</html>

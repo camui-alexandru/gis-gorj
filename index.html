@@ -32,6 +32,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .btn-add{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
 .btn-add:hover{background:#1a6fef}
 .coord-display{font-size:11px;color:var(--muted);font-family:monospace;min-width:180px;text-align:right}
+.user-badge{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--text);white-space:nowrap}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;white-space:nowrap;transition:.15s;font-family:inherit}
+.btn-logout:hover{background:rgba(231,76,60,.12);color:var(--red);border-color:rgba(231,76,60,.4)}
 
 /* ── MAIN ──────────────────────────────────────────────────────── */
 .main{display:flex;flex:1;overflow:hidden;position:relative}
@@ -311,6 +314,22 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 </style>
 </head>
 <body>
+<script>
+(function(){
+  var AUTH_KEY='gis_gorj_auth';
+  var AUTH_USER_KEY='gis_gorj_user';
+  var stored=sessionStorage.getItem(AUTH_KEY)||localStorage.getItem(AUTH_KEY);
+  if(stored!=='ok'){location.replace('login.html');return;}
+  var raw=sessionStorage.getItem(AUTH_USER_KEY)||localStorage.getItem(AUTH_USER_KEY);
+  if(raw){try{var u=JSON.parse(raw);document.addEventListener('DOMContentLoaded',function(){var el=document.getElementById('userDisplay');if(el)el.textContent=u.name||u.username;});}catch(e){}}
+})();
+function logout(){
+  var K='gis_gorj_auth',UK='gis_gorj_user';
+  sessionStorage.removeItem(K);sessionStorage.removeItem(UK);
+  localStorage.removeItem(K);localStorage.removeItem(UK);
+  location.replace('login.html');
+}
+</script>
 
 <!-- ── TOPBAR ─────────────────────────────────────────────────── -->
 <div class="topbar">
@@ -344,6 +363,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     <button class="tool-btn" id="cadSearchBtn" onclick="openCadSearch()" title="Caută număr cadastral">🔎 Căutare cadastrală</button>
     <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
     <div class="coord-display" id="coordDisplay">—</div>
+    <div class="tool-sep"></div>
+    <div class="user-badge">👤 <span id="userDisplay">—</span></div>
+    <button class="btn-logout" onclick="logout()" title="Deconectare">⏻ Ieșire</button>
   </div>
 </div>
 
