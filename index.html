@@ -523,7 +523,6 @@ const CATEGORIES = [
   { id:'utilitati', icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
   { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
-  { id:'geografie', icon:'🌍', label:'Geografie',               color:'#5dade2' },
   { id:'proiecte',  icon:'📐', label:'Proiecte',                 color:'#ff7043' },
   { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
@@ -565,52 +564,6 @@ const PUG_RENDERER = {
     'Zona cai de comunicatie rutiera si amenajari aferente': { fill:[197,0,255],  outline:[0,0,0] },
   }
 };
-// CLC (CORINE Land Cover) renderer — matches both CODE_18/CODE_21 numeric and label fields
-const CLC_RENDERER = {
-  field: '__clc_auto__', // sentinel — handled in rendererStyle via custom logic
-  _clcColors: {
-    // Zone construite — gri deschis
-    built:   { fill:[200,200,200], outline:[150,150,150] },
-    // Agricol arabil/livezi/vii — galben deschis
-    agri:    { fill:[255,230,130], outline:[180,160,80]  },
-    // Pajiști, pășuni, fânețe — verde deschis
-    pasture: { fill:[180,230,150], outline:[110,160,80]  },
-    // Păduri — verde închis
-    forest:  { fill:[50,130,60],   outline:[30,90,40]    },
-    // Zone miniere/industriale — gri închis
-    mining:  { fill:[100,100,100], outline:[60,60,60]    },
-    // Zone umede — albastru deschis
-    wetland: { fill:[130,200,240], outline:[70,140,190]  },
-    // Ape — albastru închis
-    water:   { fill:[30,100,200],  outline:[20,60,150]   },
-    // Default
-    other:   { fill:[210,200,190], outline:[140,130,120] },
-  },
-};
-function clcCategory(props) {
-  // Try numeric CODE_18 / CODE_21 / CODE_06 fields (CORINE standard)
-  const code = parseInt(props.CODE_18 || props.CODE_21 || props.CODE_06 || props.code || props.Code || 0);
-  if (code) {
-    if (code >= 111 && code <= 142) return 'built';
-    if (code >= 211 && code <= 244) return 'agri';
-    if (code >= 231 && code <= 243) return 'pasture';
-    if (code >= 311 && code <= 324) return 'forest';
-    if (code >= 131 && code <= 133) return 'mining';
-    if (code >= 411 && code <= 423) return 'wetland';
-    if (code >= 511 && code <= 523) return 'water';
-    return 'other';
-  }
-  // Try label fields
-  const lbl = String(props.LABEL3 || props.LABEL2 || props.LABEL1 || props.label || props.Label || props.tip || props.tip_clc || props.class || '').toLowerCase();
-  if (/constru|urban|resid|indust|transp|aeroport|port/.test(lbl)) return 'built';
-  if (/arabil|cereale|cultur|livad|vie|viticol|hort|agricol/.test(lbl)) return 'agri';
-  if (/pajist|paj|pasun|faneat|fan|pa[șs]un/.test(lbl)) return 'pasture';
-  if (/pad|padu|fore|silv|arbust/.test(lbl)) return 'forest';
-  if (/miner|extr|cariera|halda|depozit|industri/.test(lbl)) return 'mining';
-  if (/umed|mlast|turbarie|mlas/.test(lbl)) return 'wetland';
-  if (/apa|lac|rau|canal|ocean|mare|rezervor|bazin/.test(lbl)) return 'water';
-  return 'other';
-}
 
 function rgbaToHex([r,g,b,a=255]) {
   if (a === 0) return 'transparent';
@@ -627,14 +580,8 @@ function rendererStyle(renderer, feature, hovered, opacityMult = 1) {
   if (utr.endsWith('-comuna') || utr.includes('extravilan') || utr.includes('teritoriu')) {
     return { color:'transparent', weight:0, opacity:0, fillColor:'transparent', fillOpacity:0 };
   }
-  let entry;
-  if (renderer._clcColors) {
-    const cat = clcCategory(props);
-    entry = renderer._clcColors[cat] || renderer._clcColors.other;
-  } else {
-    const val = props[renderer.field];
-    entry = renderer.values ? renderer.values[val] : undefined;
-  }
+  const val = props[renderer.field];
+  const entry = renderer.values[val];
   const fill   = entry ? rgbaToHex(entry.fill)    : 'transparent';
   const stroke = entry ? rgbaToHex(entry.outline) : 'transparent';
   const fillA  = entry ? (entry.fill[3] ?? 255) / 255 : 0;
@@ -1797,9 +1744,6 @@ async function loadStaticLayers() {
   createFgbLayer('static_cursuri_apa', 'Cursuri Apă', '#3498db', 'DATA/cursuri_apa.fgb', { cat:'mediu', minZoom:9 });
   createFgbLayer('static_lacuri',      'Lacuri',      '#2980b9', 'DATA/lacuri.fgb',      { cat:'mediu', minZoom:9 });
   createFgbLayer('static_natura2000',  'Sit Natura 2000', '#27ae60', 'DATA/SIT_NATURA2000.fgb', { cat:'mediu', minZoom:8, _withLabels:true, _labelField:'SitName', _labelMinZoom:11 });
-
-  // ── Geografie ──
-  createFgbLayer('static_clc', 'CLC — Utilizare Teren', '#90c050', 'DATA/CLC.fgb', { cat:'geografie', minZoom:9, _noIndex:true, _renderer:CLC_RENDERER, _opacity:0.75 });
 
   // ── Proiecte ──
   createFgbLayer('static_vo_balesti',  'VO Bălești',   '#ff7043', 'DATA/VO_Balesti.fgb',  { cat:'proiecte', minZoom:9 });
