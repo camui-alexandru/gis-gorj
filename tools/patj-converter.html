@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PATJ Gorj — Convertor SHP → FGB</title>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{--bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;
+  --accent:#2a7fff;--green:#2ecc71;--orange:#e8a838;--red:#e74c3c;--text:#d8e4f0;--muted:#5a7090}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+h1{font-size:18px;font-weight:700;margin-bottom:4px}
+.sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.card h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px}
+
+/* Drop zone */
+.drop-zone{border:2px dashed var(--border);border-radius:8px;padding:28px 16px;text-align:center;
+  cursor:pointer;transition:.2s;background:var(--bg);position:relative}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:#0d1e35}
+.drop-zone.has-files{border-color:var(--green);border-style:solid}
+.dz-icon{font-size:36px;margin-bottom:8px}
+.dz-title{font-size:14px;font-weight:700;margin-bottom:4px}
+.dz-sub{font-size:12px;color:var(--muted)}
+.dz-btns{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.btn{padding:7px 16px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:700;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#1a6fef}
+.btn-secondary{background:var(--panel2);color:var(--text)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-green{background:#1a7a3a;color:#fff;border-color:#2ecc71;font-size:14px;padding:10px 24px}
+.btn-green:hover:not(:disabled){background:#1e8f43}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:700;font-size:11px;white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid #0d1828;vertical-align:middle}
+tr:hover td{background:var(--panel2)}
+.col-src{color:var(--text);font-family:monospace;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.col-fgb{color:var(--accent);font-family:monospace;font-size:11px;white-space:nowrap}
+.col-status{min-width:130px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.b-wait{background:#1a2840;color:var(--muted)}
+.b-ok{background:#103820;color:var(--green)}
+.b-err{background:#3a1010;color:var(--red)}
+.b-run{background:#2a1f08;color:var(--orange)}
+.b-merge{background:#1a1040;color:#9b59b6}
+.b-skip{background:#1a2840;color:#5a7090}
+.merge-note{font-size:10px;color:#9b59b6;margin-top:2px}
+
+/* Progress */
+.prog-bar{height:3px;background:var(--border);border-radius:2px;margin-top:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .2s}
+
+/* Global status */
+.global-prog{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.global-prog .g-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.global-prog .g-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s}
+.global-prog .g-label{font-size:12px;color:var(--muted);white-space:nowrap;min-width:60px;text-align:right}
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;
+  font-family:monospace;font-size:11px;color:var(--muted);max-height:120px;overflow-y:auto;white-space:pre-wrap}
+.log-box .ok{color:var(--green)}.log-box .err{color:var(--red)}.log-box .info{color:var(--accent)}
+
+/* Instructions */
+.instr{font-size:12px;color:var(--muted);line-height:1.7}
+.instr b{color:var(--text)}
+.instr code{background:var(--panel2);padding:1px 5px;border-radius:3px;font-family:monospace;color:var(--accent);font-size:11px}
+ol.steps{padding-left:18px;display:flex;flex-direction:column;gap:6px}
+
+/* Unmapped section */
+.unmapped-lbl{font-size:11px;color:var(--orange);margin-top:8px}
+.no-files{padding:20px;text-align:center;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>🗺 PATJ Gorj — Convertor SHP → FGB</h1>
+<p class="sub">Convertește automat toate straturile PATJ din format Shapefile în FlatGeobuf gata de upload în platformă.</p>
+
+<!-- Step 1: Select files -->
+<div class="card">
+  <h2>Pasul 1 — Selectează fișierele SHP</h2>
+  <div class="drop-zone" id="dropZone"
+       ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+    <div class="dz-icon">📂</div>
+    <div class="dz-title" id="dzTitle">Trage folderul PATJ aici sau alege fișierele</div>
+    <div class="dz-sub">Acceptă .shp, .dbf, .prj din orice subdosar</div>
+    <div class="dz-btns">
+      <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">
+        📁 Selectează folder PATJ (recomandat)
+      </button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+        📄 Alege fișiere individual
+      </button>
+    </div>
+  </div>
+  <input type="file" id="folderInput" webkitdirectory multiple style="display:none" onchange="onFilesChosen(this.files)">
+  <input type="file" id="fileInput" multiple accept=".shp,.dbf,.prj,.cpg,.qpj" style="display:none" onchange="onFilesChosen(this.files)">
+</div>
+
+<!-- Step 2: Review matches -->
+<div class="card" id="reviewCard" style="display:none">
+  <h2>Pasul 2 — Straturi detectate</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Fișier SHP sursă</th>
+        <th>→ Fișier FGB ieșire</th>
+        <th>Stare</th>
+      </tr></thead>
+      <tbody id="layerTbody"></tbody>
+    </table>
+  </div>
+  <div id="unmappedSection" style="display:none">
+    <div class="unmapped-lbl">⚠ Fișiere nerecunoscute (vor fi convertite cu numele original):</div>
+    <table style="margin-top:6px">
+      <tbody id="unmappedTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Step 3: Convert -->
+<div class="card" id="convertCard" style="display:none">
+  <h2>Pasul 3 — Conversie</h2>
+  <div class="global-prog">
+    <div class="g-bar"><div class="g-fill" id="gFill" style="width:0%"></div></div>
+    <div class="g-label" id="gLabel">0 / 0</div>
+  </div>
+  <div class="log-box" id="logBox">Aștept...</div>
+  <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-green" id="btnConvert" onclick="startConvert()">⚙ Convertește Tot</button>
+    <button class="btn btn-primary" id="btnZip" onclick="downloadZip()" disabled>📦 Descarcă ZIP (DATA/PATJ/)</button>
+    <span id="convertInfo" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+</div>
+
+<!-- Step 4: Upload instructions -->
+<div class="card" id="uploadCard" style="display:none">
+  <h2>Pasul 4 — Uploadează în GitHub</h2>
+  <div class="instr">
+    <ol class="steps">
+      <li>Extrage <b>ZIP-ul</b> descărcat — conține un folder <code>DATA/PATJ/</code> cu toate fișierele <code>.fgb</code></li>
+      <li>Mergi pe <b>github.com</b> → repozitoriul <code>camui-alexandru/gis-gorj</code></li>
+      <li>Navighează în folderul <code>DATA/</code> → creează subfolder <code>PATJ</code> dacă nu există</li>
+      <li>Click <b>"Add file" → "Upload files"</b> și trage toate fișierele <code>.fgb</code></li>
+      <li>Commit direct pe <b>main</b> cu mesajul <code>Add PATJ FGB layers</code></li>
+      <li>Platformă GIS va afișa automat straturile în meniu ✓</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+// ── STEREO70 ──────────────────────────────────────────────────────
+proj4.defs('EPSG:31700',
+  '+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 ' +
+  '+ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs');
+
+// ── LAYER MAPPING ─────────────────────────────────────────────────
+// match[] = fragmente de text normalizate (fara spatii/_, lowercase) din filename sau path
+const LAYER_MAP = [
+  // Mediu & Riscuri
+  { fgb:'PATJ_risc_inundatii',      cat:'🛡 Mediu',   match:['riscm','risc_m','inundabilitate','riscul','benzi_inund','risc_inundatii'] },
+  { fgb:'PATJ_seismic',             cat:'🛡 Mediu',   match:['intensitatesesismica','seismica','seismic'] },
+  { fgb:'PATJ_ANP',                 cat:'🛡 Mediu',   match:['limiteanp','limite_anp','ariinaturale','anp'] },
+  { fgb:'PATJ_zone_miniere',        cat:'🛡 Mediu',   match:['zone_miniere','miniere_gorj','zonemin','miniere'] },
+  { fgb:'PATJ_SEVESO',              cat:'🛡 Mediu',   match:['seveso','obiective_seveso','obiectiveseveso'] },
+  { fgb:'PATJ_poluatori_IED',       cat:'🛡 Mediu',   match:['poluatoriied','poluatori_ied','ied'] },
+  // Turism
+  { fgb:'PATJ_turism_areal',        cat:'📊 Eco',     match:['arealpotential','arealturistic','areal_potential','potential_turistic'] },
+  { fgb:'PATJ_partii_schi',         cat:'📊 Eco',     match:['partiischi','partii_de_schi','partiischi','desche'] },
+  { fgb:'PATJ_statiuni',            cat:'📊 Eco',     match:['statiunituristice','statiuni_turistice','statiuni'] },
+  // Retea Localitati
+  { fgb:'PATJ_roluri_teritoriale',  cat:'🏙 Retea',   match:['roluriteri','roluri_terit','roluritertoriale','roluri'] },
+  { fgb:'PATJ_sisteme_urbane',      cat:'🏙 Retea',   match:['sistemeurbane','sisteme_urbane','sisteme'] },
+  { fgb:'PATJ_orase',               cat:'🏙 Retea',   match:['orase'] },
+  { fgb:'PATJ_ZM_Tg_Jiu',          cat:'🏙 Retea',   match:['zmtgjiu','zm_tg_jiu','zonametropolitana','zonamet'] },
+  { fgb:'PATJ_UATB_demografice',    cat:'🏙 Retea',   match:['clasificaridemografice','demografice','uatbclasif'] },
+  // Cai Comunicatii
+  { fgb:'PATJ_stare_drumuri',       cat:'🛤 Com',     match:['staredrumuri','stare_drumuri','stare drumuri'] },
+  { fgb:'PATJ_ocolitoare',          cat:'🛤 Com',     match:['ocolitoare'] },
+  { fgb:'PATJ_ocolitoare_propuse',  cat:'🛤 Com',     match:['propuneriocol','propocol','ocolitoareprop','propuneri_ocolitoare'] },
+  { fgb:'PATJ_transport_public',    cat:'🛤 Com',     match:['rutetransport','rute_transport','transportpublic','rutedtransport'] },
+  { fgb:'PATJ_noduri_rutiere',      cat:'🛤 Com',     match:['nodurirutiere','noduri_rutiere','noduri'] },
+  { fgb:'PATJ_poduri',              cat:'🛤 Com',     match:['poduri'] },
+  { fgb:'PATJ_aerodrom',            cat:'🛤 Com',     match:['aerodrom','aeroport'] },
+  { fgb:'PATJ_statii_EV',           cat:'🛤 Com',     match:['statiiev','incarcareelectrica','statiiincarcare','statiielect'] },
+  { fgb:'PATJ_gari_halte',          cat:'🛤 Com',     match:['gari','halte','garisihalte','gari_halte'] },
+  // Infrastructuri Tehnice
+  { fgb:'PATJ_conducte_gaze',       cat:'⚙ Teh',     match:['condgaze','conducte_gaze','conductegaze','gaze'] },
+  { fgb:'PATJ_colectoare_ROMGAZ',   cat:'⚙ Teh',     match:['colectoareromgaz','colect_romgaz','romgaz'] },
+  { fgb:'PATJ_conducte_CONPET',     cat:'⚙ Teh',     match:['condconpet','conducte_conpet','condconpet','conpet'] },
+  { fgb:'PATJ_conducte_OMV',        cat:'⚙ Teh',     match:['condomv','conducte_omv','omv'] },
+  { fgb:'PATJ_transelectrica',      cat:'⚙ Teh',     match:['transelectrica'] },
+  { fgb:'PATJ_producere_EE',        cat:'⚙ Teh',     match:['produceree','producere_ee','producereenergie','energieelectrica'] },
+  { fgb:'PATJ_aductiuni',           cat:'⚙ Teh',     match:['aductiuni'] },
+  { fgb:'PATJ_surse_subterane',     cat:'⚙ Teh',     match:['sursesubt','surse_subt','surse_subterane'] },
+  { fgb:'PATJ_surse_superficiale',  cat:'⚙ Teh',     match:['sursesupr','surse_supr','surse_superficiale'] },
+  { fgb:'PATJ_fibra_optica',        cat:'⚙ Teh',     match:['patjfibra','patj_fibra','fibraoptica','fibra'] },
+  { fgb:'PATJ_infr_deseuri',        cat:'⚙ Teh',     match:['infrdeseuri','infr_deseuri','deseuri'] },
+  { fgb:'PATJ_SACET',               cat:'⚙ Teh',     match:['sacet'] },
+  { fgb:'PATJ_depozite_titei',      cat:'⚙ Teh',     match:['depozitetitei','depozite_titei','titei'] },
+  // Economic & Turism
+  { fgb:'PATJ_zone_defavorizate',   cat:'📊 Eco',     match:['zonedefavorizate','zone_defav','defavorizate'] },
+  { fgb:'PATJ_profil_economic',     cat:'📊 Eco',     match:['profileconomic','profil_economic','profileco'] },
+  // Zone functionale – mai multe SHP-uri se unesc intr-un singur FGB
+  { fgb:'PATJ_zone_functionale',    cat:'📊 Eco',     match:['zonacentrala','zonaestica','zonanordica','zonavestica','zone_functionale','zonarefunctionala','zonacentr','zonaest','zonanord','zonaves'] },
+  { fgb:'PATJ_masuri_UATB',         cat:'📊 Eco',     match:['masuriintegrate','uatbmasuri','uatbpolygon','masuri_integrate','masuri'] },
+  { fgb:'PATJ_zone_conflicte',      cat:'📊 Eco',     match:['zonepotentiale','zonepotconf','conflicte','potentialeconflicte'] },
+  { fgb:'PATJ_exploatari_ANRM',     cat:'📊 Eco',     match:['exploatarianrm','exploatari_anrm','anrm'] },
+  { fgb:'PATJ_UATB_turism',         cat:'📊 Eco',     match:['uatbdateec','uatbturism','dateeconturism','date_econ'] },
+  { fgb:'PATJ_UATB_resurse_sol',    cat:'📊 Eco',     match:['resurse_sol','resurse_sol_sub','uatbresurse'] },
+  { fgb:'PATJ_UATB_disfunctional',  cat:'📊 Eco',     match:['disfunctional','disfunctionalit'] },
+  { fgb:'PATJ_UATB_salariati',      cat:'📊 Eco',     match:['salariati','uatbsal'] },
+  { fgb:'PATJ_centre_comerciale',   cat:'📊 Eco',     match:['centrecom','centre_comerciale','centrecomerciale'] },
+];
+
+function norm(s) {
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'') // strip diacritics
+    .replace(/[^a-z0-9]/g,'');                        // keep only alphanum
+}
+
+function findMapping(basename, relativePath) {
+  const nb = norm(basename);
+  const np = norm(relativePath || basename);
+  for (const m of LAYER_MAP) {
+    for (const kw of m.match) {
+      const nk = norm(kw);
+      if (nb === nk || nb.includes(nk) || nk.includes(nb)) return m;
+      if (np.includes(nk)) return m;
+    }
+  }
+  return null;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────
+let shpGroups = []; // { basename, path, shpFile, dbfFile, prjFile, mapping, status, fgbName, rowId }
+let fgbResults = {}; // fgbName -> Uint8Array (for zip)
+let convertRunning = false;
+
+// ── DRAG & DROP ───────────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
+function onDragLeave()  { document.getElementById('dropZone').classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const items = e.dataTransfer.items;
+  if (items) {
+    const files = [];
+    for (const item of items) {
+      if (item.kind === 'file') files.push(item.getAsFile());
+    }
+    onFilesChosen(files);
+  } else {
+    onFilesChosen(e.dataTransfer.files);
+  }
+}
+
+// ── FILE PROCESSING ───────────────────────────────────────────────
+function onFilesChosen(rawFiles) {
+  const files = Array.from(rawFiles);
+
+  // Group by base path (dir + basename without ext)
+  const groups = {}; // key -> { basename, relPath, files: {} }
+  for (const f of files) {
+    const rp = f.webkitRelativePath || f.name;
+    const parts = rp.replace(/\\/g,'/').split('/');
+    const fname = parts[parts.length - 1];
+    const ext = fname.split('.').pop().toLowerCase();
+    if (!['shp','dbf','prj','cpg','qpj'].includes(ext)) continue;
+    const base = fname.replace(/\.[^.]+$/,'');
+    const dir  = parts.slice(0,-1).join('/');
+    const key  = dir + '/' + base;
+    if (!groups[key]) groups[key] = { basename:base, relPath:rp, dir, files:{} };
+    groups[key].files[ext] = f;
+  }
+
+  // Only keep groups that have a .shp
+  shpGroups = Object.values(groups)
+    .filter(g => g.files.shp)
+    .map((g,i) => {
+      const mapping = findMapping(g.basename, g.dir);
+      return {
+        id: 'row_'+i,
+        basename: g.basename,
+        relPath: g.relPath,
+        dir: g.dir,
+        shpFile: g.files.shp,
+        dbfFile: g.files.dbf || null,
+        prjFile: g.files.prj || null,
+        mapping,
+        fgbName: mapping ? mapping.fgb : g.basename,
+        status: 'wait',
+      };
+    });
+
+  if (!shpGroups.length) {
+    alert('Nu am găsit fișiere .shp în selecția ta. Asigură-te că ai ales folderul corect.');
+    return;
+  }
+
+  document.getElementById('dropZone').classList.add('has-files');
+  document.getElementById('dzTitle').textContent = `${shpGroups.length} fișiere SHP detectate`;
+
+  buildTable();
+  document.getElementById('reviewCard').style.display = '';
+  document.getElementById('convertCard').style.display = '';
+}
+
+function buildTable() {
+  const tbody = document.getElementById('layerTbody');
+  const unmapTbody = document.getElementById('unmappedTbody');
+  tbody.innerHTML = '';
+  unmapTbody.innerHTML = '';
+
+  // Track merge groups
+  const fgbCount = {};
+  for (const g of shpGroups) {
+    if (g.mapping) fgbCount[g.fgbName] = (fgbCount[g.fgbName] || 0) + 1;
+  }
+
+  const mapped = shpGroups.filter(g => g.mapping);
+  const unmapped = shpGroups.filter(g => !g.mapping);
+
+  for (const g of mapped) {
+    const isMerge = fgbCount[g.fgbName] > 1;
+    const tr = document.createElement('tr');
+    tr.id = g.id;
+    tr.innerHTML = `
+      <td class="col-src" title="${g.relPath}">${g.basename}.shp
+        <div style="font-size:10px;color:var(--muted)">${g.dir || ''}</div></td>
+      <td class="col-fgb">${g.fgbName}.fgb
+        ${isMerge ? '<div class="merge-note">⊕ va fi unificat cu alte straturi</div>' : ''}</td>
+      <td class="col-status"><span class="badge b-wait" id="badge_${g.id}">⏳ Aștept</span>
+        <div class="prog-bar"><div class="prog-fill" id="prog_${g.id}" style="width:0%"></div></div></td>`;
+    tbody.appendChild(tr);
+  }
+
+  if (unmapped.length) {
+    document.getElementById('unmappedSection').style.display = '';
+    for (const g of unmapped) {
+      const tr = document.createElement('tr');
+      tr.id = g.id;
+      tr.innerHTML = `
+        <td class="col-src">${g.basename}.shp
+          <div style="font-size:10px;color:var(--muted)">${g.dir||''}</div></td>
+        <td class="col-fgb" style="color:var(--orange)">${g.basename}.fgb <span style="color:var(--muted)">(auto)</span></td>
+        <td class="col-status"><span class="badge b-wait" id="badge_${g.id}">⏳ Aștept</span>
+          <div class="prog-bar"><div class="prog-fill" id="prog_${g.id}" style="width:0%"></div></div></td>`;
+      unmapTbody.appendChild(tr);
+    }
+  }
+
+  document.getElementById('gLabel').textContent = `0 / ${shpGroups.length}`;
+}
+
+// ── CONVERSION ────────────────────────────────────────────────────
+function setStatus(id, cls, text) {
+  const el = document.getElementById('badge_'+id);
+  if (el) { el.className = 'badge '+cls; el.textContent = text; }
+}
+function setProg(id, pct) {
+  const el = document.getElementById('prog_'+id);
+  if (el) el.style.width = pct+'%';
+}
+function log(msg, cls='') {
+  const box = document.getElementById('logBox');
+  const line = document.createElement('span');
+  line.className = cls;
+  line.textContent = msg + '\n';
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function isStereo70(fc) {
+  const f = fc.features[0];
+  if (!f) return false;
+  let coords = f.geometry?.coordinates;
+  while (Array.isArray(coords[0])) coords = coords[0];
+  const x = coords[0], y = coords[1];
+  return x > 100000 && x < 900000 && y > 100000 && y < 900000;
+}
+
+function needsReproj(prjText) {
+  if (!prjText) return false;
+  return /stereo|31700|Stereo|STEREO/i.test(prjText);
+}
+
+async function reprojectFC(fc) {
+  const conv = proj4('EPSG:31700','WGS84');
+  function reproCoord(c) {
+    if (typeof c[0] === 'number') return conv.forward(c);
+    return c.map(reproCoord);
+  }
+  fc.features = fc.features.map(f => {
+    if (!f.geometry || !f.geometry.coordinates) return f;
+    return { ...f, geometry: { ...f.geometry, coordinates: reproCoord(f.geometry.coordinates) }};
+  });
+  return fc;
+}
+
+async function convertGroup(g) {
+  setStatus(g.id,'b-run','⚙ Conversie...');
+  setProg(g.id, 20);
+  const shpBuf = await g.shpFile.arrayBuffer();
+  setProg(g.id, 40);
+  const dbfBuf = g.dbfFile ? await g.dbfFile.arrayBuffer() : null;
+  const prjText = g.prjFile ? await g.prjFile.text() : null;
+
+  const geoms = await shp.parseShp(shpBuf);
+  let features;
+  if (dbfBuf) {
+    const attrs = await shp.parseDbf(dbfBuf);
+    features = geoms.map((geo,i) => ({ type:'Feature', geometry:geo, properties: attrs[i]||{} }));
+  } else {
+    features = geoms.map(geo => ({ type:'Feature', geometry:geo, properties:{} }));
+  }
+  let fc = { type:'FeatureCollection', features };
+  setProg(g.id, 60);
+
+  // Reproiectare Stereo70 → WGS84
+  if (needsReproj(prjText) || isStereo70(fc)) {
+    fc = await reprojectFC(fc);
+    log(`  ↩ Reproeictat Stereo70→WGS84 (${g.basename})`, 'info');
+  }
+
+  // Filtrează geometrii null
+  fc.features = fc.features.filter(f => f.geometry && f.geometry.coordinates);
+  setProg(g.id, 80);
+  return fc;
+}
+
+async function startConvert() {
+  if (convertRunning) return;
+  convertRunning = true;
+  document.getElementById('btnConvert').disabled = true;
+  document.getElementById('logBox').textContent = '';
+  fgbResults = {};
+
+  // Group by fgbName for merging
+  const fgbGroups = {}; // fgbName -> [group]
+  for (const g of shpGroups) {
+    if (!fgbGroups[g.fgbName]) fgbGroups[g.fgbName] = [];
+    fgbGroups[g.fgbName].push(g);
+  }
+
+  const fgbNames = Object.keys(fgbGroups);
+  let done = 0;
+
+  for (const fgbName of fgbNames) {
+    const groups = fgbGroups[fgbName];
+    const isMerge = groups.length > 1;
+    const allFeatures = [];
+    let anyFailed = false;
+
+    for (const g of groups) {
+      try {
+        const fc = await convertGroup(g);
+        allFeatures.push(...fc.features);
+        setStatus(g.id, 'b-ok', `✓ ${fc.features.length} feat.`);
+        setProg(g.id, 100);
+        log(`✓ ${g.basename}.shp → ${fgbName}.fgb (${fc.features.length} features)`, 'ok');
+      } catch(e) {
+        setStatus(g.id, 'b-err', '✗ Eroare');
+        setProg(g.id, 0);
+        log(`✗ ${g.basename}: ${e.message}`, 'err');
+        anyFailed = true;
+      }
+    }
+
+    if (allFeatures.length && !anyFailed) {
+      try {
+        const merged = { type:'FeatureCollection', features: allFeatures };
+        const fgb = flatgeobuf.serialize(merged);
+        fgbResults[fgbName + '.fgb'] = fgb;
+        if (isMerge) log(`  ⊕ Unificat ${groups.length} straturi → ${fgbName}.fgb (${allFeatures.length} total)`, 'info');
+      } catch(e) {
+        log(`✗ Serializare FGB eșuată pentru ${fgbName}: ${e.message}`, 'err');
+      }
+    }
+
+    done++;
+    document.getElementById('gFill').style.width = (done/fgbNames.length*100)+'%';
+    document.getElementById('gLabel').textContent = `${done} / ${fgbNames.length}`;
+    await new Promise(r => setTimeout(r, 20)); // permite UI update
+  }
+
+  const okCount = Object.keys(fgbResults).length;
+  log(`\n✓ Gata: ${okCount} fișiere FGB convertite.`, 'ok');
+  document.getElementById('btnZip').disabled = false;
+  document.getElementById('uploadCard').style.display = '';
+  document.getElementById('convertInfo').textContent = `${okCount} fișiere FGB pregătite`;
+  convertRunning = false;
+}
+
+async function downloadZip() {
+  if (!Object.keys(fgbResults).length) return;
+  const zip = new JSZip();
+  const folder = zip.folder('DATA').folder('PATJ');
+  for (const [name, data] of Object.entries(fgbResults)) {
+    folder.file(name, data);
+  }
+  const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:3} });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'PATJ_FGB_Gorj.zip';
+  a.click();
+}
+</script>
+</body>
+</html>
