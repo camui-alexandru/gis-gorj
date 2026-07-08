@@ -84,6 +84,19 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .layer-group-body.closed{max-height:0}
 .layer-group-body .layer-row{padding-left:42px}
 .layer-group-body .layer-opacity{padding-left:42px}
+
+/* ── SUB-CATEGORII (ex: PATJ sub Urbanism) ────────────────────────── */
+.cat-sub>.cat-header{padding:6px 10px 6px 20px;background:#0c1725;border-top:1px solid var(--border)}
+.cat-sub>.cat-header .cat-name{font-size:11px;color:var(--accent2);letter-spacing:.3px}
+.cat-sub>.cat-header .cat-icon{font-size:12px}
+/* ── SUB-SUB-CATEGORII (ex: Mediu sub PATJ) ─────────────────────────*/
+.cat-sub2>.cat-header{padding:5px 10px 5px 32px;background:#091420}
+.cat-sub2>.cat-header .cat-name{font-size:11px;color:var(--text)}
+.cat-sub2>.cat-header .cat-icon{font-size:11px}
+.cat-sub2 .layer-row{padding-left:46px}
+.cat-sub2 .layer-opacity{padding-left:46px}
+.cat-sub2 .layer-group-body .layer-row{padding-left:60px}
+.cat-sub2 .layer-group-body .layer-opacity{padding-left:60px}
 .sb-empty{padding:20px 12px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center}
 .sb-footer{border-top:1px solid var(--border);padding:8px 10px;display:flex;gap:6px}
 .sf-btn{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:5px;border-radius:5px;cursor:pointer;font-size:11px;text-align:center}
@@ -517,19 +530,20 @@ function logout(){
 // STATE
 // ═══════════════════════════════════════════════════════════════════
 const CATEGORIES = [
-  { id:'cadastru',      icon:'📍', label:'Cadastru',               color:'#e8a838' },
-  { id:'urbanism',      icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'drumuri',       icon:'🛣', label:'Transport',               color:'#e74c3c' },
-  { id:'utilitati',     icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
-  { id:'transport',     icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
-  { id:'mediu',         icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
-  { id:'proiecte',      icon:'📐', label:'Proiecte',                color:'#ff7043' },
-  { id:'patj_mediu',    icon:'🛡', label:'PATJ — Mediu & Riscuri',  color:'#c0392b' },
-  { id:'patj_retea',    icon:'🏙', label:'PATJ — Rețea Localități', color:'#8e44ad' },
-  { id:'patj_comunicatii', icon:'🛤', label:'PATJ — Căi Comunicații', color:'#d35400' },
-  { id:'patj_tehnic',   icon:'⚙', label:'PATJ — Infrastructuri Tehnice', color:'#16a085' },
-  { id:'patj_economic', icon:'📊', label:'PATJ — Economic & Turism', color:'#2980b9' },
-  { id:'altele',        icon:'📋', label:'Altele',                  color:'#7f8c8d' },
+  { id:'cadastru',         icon:'📍', label:'Cadastru',               color:'#e8a838' },
+  { id:'urbanism',         icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
+  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b', parent:'urbanism' },
+  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
+  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
+  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
+  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
+  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
+  { id:'drumuri',          icon:'🛣', label:'Transport',               color:'#e74c3c' },
+  { id:'utilitati',        icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
+  { id:'transport',        icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
+  { id:'mediu',            icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
+  { id:'proiecte',         icon:'📐', label:'Proiecte',                color:'#ff7043' },
+  { id:'altele',           icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
 
 
@@ -1004,25 +1018,17 @@ function renderTree() {
     </div>` : ''}`;
   }
 
-  tree.innerHTML = CATEGORIES.map(cat => {
-    const catLayers = layers.filter(l => l.cat === cat.id && (!q || l.name.toLowerCase().includes(q)));
-    if (q && !catLayers.length) return '';
-    total += catLayers.length;
-    const open = CAT_STATE[cat.id].open;
-    const visCount = catLayers.filter(l => l.visible).length;
-
+  function buildLayersHTML(catLayers) {
+    if (!catLayers.length) return '';
     const reversed = [...catLayers].reverse();
     const groups = {};
-    const ungrouped = [];
     reversed.forEach(l => {
       if (l.group) {
         if (!groups[l.group]) groups[l.group] = { label: l.groupLabel || l.group.toUpperCase(), color: l.groupColor || l.color, members: [] };
         groups[l.group].members.push(l);
-      } else ungrouped.push(l);
+      }
     });
-
-    let bodyHTML = '';
-    if (!catLayers.length) bodyHTML = `<div style="padding:6px 28px;font-size:11px;color:var(--muted)">— niciun strat —</div>`;
+    let html = '';
     const rendered = new Set();
     reversed.forEach(l => {
       if (l.group) {
@@ -1031,7 +1037,7 @@ function renderTree() {
         const g = groups[l.group];
         const gOpen = GROUP_STATE[l.group] ?? false;
         const gVis = g.members.some(m => m.visible);
-        bodyHTML += `<div class="layer-group-hdr" onclick="toggleGroup('${l.group}')">
+        html += `<div class="layer-group-hdr" onclick="toggleGroup('${l.group}')">
           <span class="grp-arrow">${gOpen ? '▾' : '▸'}</span>
           <span class="grp-vis ${gVis ? 'on' : ''}" onclick="event.stopPropagation();toggleGroupVis('${l.group}')" title="${gVis ? 'Ascunde tot' : 'Arată tot'}">
             ${gVis ? '👁' : '○'}
@@ -1043,23 +1049,47 @@ function renderTree() {
           ${g.members.map(m => layerRowHTML(m)).join('')}
         </div>`;
       } else {
-        bodyHTML += layerRowHTML(l);
+        html += layerRowHTML(l);
       }
     });
+    return html;
+  }
 
+  function allDescLayers(cat) {
+    const direct = layers.filter(l => l.cat === cat.id);
+    const childCats = CATEGORIES.filter(c => c.parent === cat.id);
+    return [...direct, ...childCats.flatMap(allDescLayers)];
+  }
+
+  function renderCatBlock(cat, depth) {
+    const children = CATEGORIES.filter(c => c.parent === cat.id);
+    const catLayers = layers.filter(l => l.cat === cat.id && (!q || l.name.toLowerCase().includes(q)));
+    const allDesc = allDescLayers(cat);
+    const allDescFiltered = q ? allDesc.filter(l => l.name.toLowerCase().includes(q)) : allDesc;
+    if (q && !allDescFiltered.length) return '';
+    total += catLayers.length;
+    const open = CAT_STATE[cat.id]?.open ?? true;
+    const visCount = allDesc.filter(l => l.visible).length;
+    const totalCount = allDesc.length;
+    let bodyHTML = buildLayersHTML(catLayers);
+    bodyHTML += children.map(ch => renderCatBlock(ch, depth + 1)).join('');
+    if (!bodyHTML) bodyHTML = `<div style="padding:6px 28px;font-size:11px;color:var(--muted)">— niciun strat —</div>`;
+    const depthCls = depth === 1 ? ' cat-sub' : depth >= 2 ? ' cat-sub2' : '';
     return `
-    <div class="cat-block" id="cat_${cat.id}">
+    <div class="cat-block${depthCls}" id="cat_${cat.id}">
       <div class="cat-header" onclick="toggleCat('${cat.id}')">
         <span class="cat-icon">${cat.icon}</span>
         <span class="cat-name">${cat.label}</span>
-        ${catLayers.length ? `<span class="cat-count">${visCount}/${catLayers.length}</span>` : ''}
+        ${totalCount ? `<span class="cat-count">${visCount}/${totalCount}</span>` : ''}
         <span class="cat-arrow">${open ? '▾' : '▸'}</span>
       </div>
       <div class="cat-body ${open ? '' : 'closed'}">
         ${bodyHTML}
       </div>
     </div>`;
-  }).join('');
+  }
+
+  tree.innerHTML = CATEGORIES.filter(c => !c.parent).map(cat => renderCatBlock(cat, 0)).join('');
 
   document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'uri' : ''}`;
   document.getElementById('featureCountBar').querySelector('span').textContent =
