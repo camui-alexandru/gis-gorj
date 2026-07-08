@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Descarcă AlunecariTeren — gis.cjgorj.ro</title>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<style>
+  body { font-family: sans-serif; max-width: 660px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  h2 { color: #7ec8e3; }
+  p  { color: #aaa; font-size: 13px; line-height: 1.6; }
+  button { padding: 12px 32px; background: #c0392b; color: #fff; border: none; border-radius: 6px;
+           cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 10px; }
+  button:disabled { background: #444; cursor: not-allowed; }
+  #log { margin-top: 16px; padding: 14px; border-radius: 6px; background: #0a1a30;
+         font-size: 12px; min-height: 100px; white-space: pre-wrap; line-height: 1.9;
+         font-family: monospace; border-left: 4px solid #f39c12; max-height: 400px; overflow-y: auto; }
+  #log.ok  { border-left-color: #2ecc71; }
+  #log.err { border-left-color: #e74c3c; }
+  progress { width: 100%; height: 10px; margin-top: 10px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h2>Descarcă AlunecariTeren.fgb</h2>
+<p>Descarcă toate features din <b>AlunecariTeren/MapServer/0</b> prin proxy CJ Gorj și exportă <b>AlunecariTeren.fgb</b>.<br>
+Coordonate returnate în <b>WGS84</b> (outSR=4326). Funcționează și local (fără server web).</p>
+<button id="btn" onclick="startDownload()">▶ Descarcă AlunecariTeren.fgb</button>
+<progress id="prog" value="0" max="100"></progress>
+<div id="log">Apasă butonul pentru a începe...</div>
+
+<script>
+const SVC_URL = 'https://gis.cjgorj.ro/server/rest/services/FIDA/AlunecariTeren/MapServer/0';
+const BATCH   = 250;
+const PROXY   = 'https://gis.cjgorj.ro/proxy/proxy.ashx?';
+
+// ── JSONP prin proxy ──────────────────────────────────────────────────────────
+function jsonp(targetUrl) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_jcb' + Date.now() + Math.floor(Math.random() * 99999);
+    const script = document.createElement('script');
+    let settled = false;
+    const cleanup = () => { if (!settled) { settled = true; delete window[cbName]; script.remove(); } };
+    window[cbName] = data => {
+      cleanup();
+      if (data && data.error) reject(new Error('ArcGIS ' + data.error.code + ': ' + data.error.message));
+      else resolve(data);
+    };
+    script.onerror = () => { cleanup(); reject(new Error('JSONP eșuat')); };
+    const sep = targetUrl.includes('?') ? '&' : '?';
+    script.src = PROXY + targetUrl + sep + 'callback=' + cbName;
+    document.head.appendChild(script);
+  });
+}
+
+// ── Esri JSON → GeoJSON geometry ─────────────────────────────────────────────
+function signedArea(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length - 1; i++)
+    a += ring[i][0] * ring[i+1][1] - ring[i+1][0] * ring[i][1];
+  return a / 2;
+}
+
+function esriGeomToGeoJSON(geom, geomType) {
+  if (!geom) return null;
+  if (geomType === 'esriGeometryPoint') {
+    if (geom.x == null) return null;
+    return { type: 'Point', coordinates: [geom.x, geom.y] };
+  }
+  if (geomType === 'esriGeometryPolyline') {
+    const p = geom.paths || [];
+    if (!p.length) return null;
+    return p.length === 1 ? { type:'LineString', coordinates:p[0] }
+                          : { type:'MultiLineString', coordinates:p };
+  }
+  if (geomType === 'esriGeometryPolygon') {
+    const rings = geom.rings || [];
+    if (!rings.length) return null;
+    if (rings.length === 1) return { type:'Polygon', coordinates:rings };
+    const sorted = rings.map(r => ({ r, a: signedArea(r) }))
+                        .sort((a, b) => Math.abs(b.a) - Math.abs(a.a));
+    const outers = sorted.filter(x => x.a <= 0).map(x => x.r);
+    const holes  = sorted.filter(x => x.a >  0).map(x => x.r);
+    if (!outers.length) return { type:'Polygon', coordinates:[sorted[0].r] };
+    if (outers.length === 1) return { type:'Polygon', coordinates:[outers[0], ...holes] };
+    return { type:'MultiPolygon', coordinates: outers.map(r => [r]) };
+  }
+  return null;
+}
+
+// ── Logging ───────────────────────────────────────────────────────────────────
+const logEl = () => document.getElementById('log');
+function appendLog(msg) { logEl().textContent += msg + '\n'; logEl().scrollTop = logEl().scrollHeight; }
+function clearLog() { logEl().textContent = ''; logEl().className = ''; }
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function startDownload() {
+  const btn  = document.getElementById('btn');
+  const prog = document.getElementById('prog');
+  btn.disabled = true;
+  clearLog();
+  prog.value = 0;
+  appendLog('Start descărcare AlunecariTeren/MapServer/0...\n');
+
+  try {
+    appendLog('Obțin metadata...');
+    const meta = await jsonp(SVC_URL + '?f=json');
+    const geomType = meta.geometryType || 'esriGeometryPolygon';
+    appendLog('Tip geometrie: ' + geomType);
+
+    const cntData = await jsonp(SVC_URL + '/query?where=1%3D1&returnCountOnly=true&f=json');
+    const total = cntData.count ?? '?';
+    appendLog('Total features în serviciu: ' + total);
+
+    const idsData = await jsonp(SVC_URL + '/query?where=1%3D1&returnIdsOnly=true&f=json');
+    const ids = (idsData.objectIds || []).sort((a, b) => a - b);
+    appendLog('ID-uri obținute: ' + ids.length);
+
+    const features = [];
+    const nBatches = Math.ceil(ids.length / BATCH);
+    let failedBatches = 0;
+
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      const bn = Math.floor(i / BATCH) + 1;
+      prog.value = Math.round((i / Math.max(ids.length, 1)) * 90);
+      appendLog('Lot ' + bn + '/' + nBatches + '  feat: ' + features.length);
+
+      let fetched = false;
+      for (const chunkSize of [batch.length, 100, 50, 10]) {
+        if (fetched) break;
+        const chunks = [];
+        for (let c = 0; c < batch.length; c += chunkSize) chunks.push(batch.slice(c, c + chunkSize));
+        let chunkFail = 0;
+        for (const chunk of chunks) {
+          const qs = 'objectIds=' + chunk.join(',') + '&outFields=*&returnGeometry=true&geometryPrecision=6&outSR=4326&f=json';
+          let data = null;
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try { data = await jsonp(SVC_URL + '/query?' + qs); break; }
+            catch(e) { await new Promise(r => setTimeout(r, 400 * attempt)); }
+          }
+          if (!data) { chunkFail++; continue; }
+          for (const feat of (data.features || [])) {
+            const geom = esriGeomToGeoJSON(feat.geometry, geomType);
+            if (!geom) continue;
+            features.push({ type:'Feature', geometry:geom, properties:feat.attributes || {} });
+          }
+          await new Promise(r => setTimeout(r, 60));
+        }
+        if (chunkFail === 0) { fetched = true; break; }
+        if (chunkSize === 10) {
+          appendLog('⚠ Lot ' + bn + ' parțial eșuat (chunk=10, ' + chunkFail + ' chunk-uri sărite)');
+          failedBatches++;
+          fetched = true;
+        }
+      }
+    }
+
+    if (failedBatches > 0) appendLog('⚠ ' + failedBatches + ' loturi eșuate (sărite)');
+    appendLog('✓ ' + features.length + ' features descărcate');
+
+    if (!features.length) {
+      logEl().className = 'err';
+      appendLog('\nNiciun feature descărcat!');
+      btn.disabled = false; return;
+    }
+
+    prog.value = 95;
+    appendLog('Convertesc în FlatGeobuf...');
+    await new Promise(r => setTimeout(r, 50));
+
+    const fgb = flatgeobuf.serialize({ type:'FeatureCollection', features });
+    const sizeMB = (fgb.byteLength / 1024 / 1024).toFixed(1);
+    prog.value = 100;
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([fgb]));
+    a.download = 'AlunecariTeren.fgb';
+    a.click();
+
+    logEl().className = 'ok';
+    appendLog('\n✓ AlunecariTeren.fgb descărcat — ' + features.length + ' features, ' + sizeMB + ' MB');
+    appendLog('Uploadează fișierul în DATA/ prin GitHub Desktop.');
+
+  } catch(e) {
+    logEl().className = 'err';
+    appendLog('\nEROARE: ' + e.message);
+  }
+
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
