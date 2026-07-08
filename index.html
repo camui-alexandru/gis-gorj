@@ -517,14 +517,19 @@ function logout(){
 // STATE
 // ═══════════════════════════════════════════════════════════════════
 const CATEGORIES = [
-  { id:'cadastru',  icon:'📍', label:'Cadastru',               color:'#e8a838' },
-  { id:'urbanism',  icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'drumuri',   icon:'🛣', label:'Transport',               color:'#e74c3c' },
-  { id:'utilitati', icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
-  { id:'transport', icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
-  { id:'mediu',     icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
-  { id:'proiecte',  icon:'📐', label:'Proiecte',                 color:'#ff7043' },
-  { id:'altele',    icon:'📋', label:'Altele',                  color:'#7f8c8d' },
+  { id:'cadastru',      icon:'📍', label:'Cadastru',               color:'#e8a838' },
+  { id:'urbanism',      icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
+  { id:'drumuri',       icon:'🛣', label:'Transport',               color:'#e74c3c' },
+  { id:'utilitati',     icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
+  { id:'transport',     icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
+  { id:'mediu',         icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
+  { id:'proiecte',      icon:'📐', label:'Proiecte',                color:'#ff7043' },
+  { id:'patj_mediu',    icon:'🛡', label:'PATJ — Mediu & Riscuri',  color:'#c0392b' },
+  { id:'patj_retea',    icon:'🏙', label:'PATJ — Rețea Localități', color:'#8e44ad' },
+  { id:'patj_comunicatii', icon:'🛤', label:'PATJ — Căi Comunicații', color:'#d35400' },
+  { id:'patj_tehnic',   icon:'⚙', label:'PATJ — Infrastructuri Tehnice', color:'#16a085' },
+  { id:'patj_economic', icon:'📊', label:'PATJ — Economic & Turism', color:'#2980b9' },
+  { id:'altele',        icon:'📋', label:'Altele',                  color:'#7f8c8d' },
 ];
 
 
@@ -1862,6 +1867,60 @@ const ArcGISDynamic = L.Layer.extend({
   // Limite Intravilan
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
+
+  // ── PATJ Gorj — Mediu & Riscuri ─────────────────────────────────
+  createFgbLayer('patj_risc_inundatii',  'Risc Inundații',          '#c0392b', 'DATA/PATJ/PATJ_risc_inundatii.fgb',  { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.7 });
+  createFgbLayer('patj_seismic',         'Intensitate Seismică',    '#e74c3c', 'DATA/PATJ/PATJ_seismic.fgb',          { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.65 });
+  createFgbLayer('patj_anp',             'Arii Naturale Protejate', '#27ae60', 'DATA/PATJ/PATJ_ANP.fgb',              { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.6 });
+  createFgbLayer('patj_zone_miniere',    'Zone Miniere',            '#795548', 'DATA/PATJ/PATJ_zone_miniere.fgb',     { cat:'patj_mediu', minZoom:9, _noIndex:true, _opacity:0.65 });
+  createFgbLayer('patj_seveso',          'Obiective SEVESO',        '#ff5722', 'DATA/PATJ/PATJ_SEVESO.fgb',           { cat:'patj_mediu', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_ied',             'Poluatori IED',           '#bf360c', 'DATA/PATJ/PATJ_poluatori_IED.fgb',   { cat:'patj_mediu', minZoom:9, _noIndex:true });
+
+  // ── PATJ Gorj — Rețea Localități ────────────────────────────────
+  createFgbLayer('patj_roluri',          'Roluri Teritoriale',      '#8e44ad', 'DATA/PATJ/PATJ_roluri_teritoriale.fgb', { cat:'patj_retea', minZoom:8, _noIndex:true, _opacity:0.7 });
+  createFgbLayer('patj_sisteme_urbane',  'Sisteme Urbane',          '#9b59b6', 'DATA/PATJ/PATJ_sisteme_urbane.fgb',    { cat:'patj_retea', minZoom:8, _noIndex:true, _opacity:0.65 });
+  createFgbLayer('patj_orase',           'Orașe',                   '#6c3483', 'DATA/PATJ/PATJ_orase.fgb',             { cat:'patj_retea', minZoom:8, _noIndex:true });
+  createFgbLayer('patj_zm_tg_jiu',       'Zona Metropolitană TG-Jiu','#e056fd','DATA/PATJ/PATJ_ZM_Tg_Jiu.fgb',        { cat:'patj_retea', minZoom:8, _noIndex:true, _opacity:0.5 });
+  createFgbLayer('patj_uatb_demografie', 'UATB Clasificări Demografice','#ad8de3','DATA/PATJ/PATJ_UATB_demografice.fgb',{ cat:'patj_retea', minZoom:8, _noIndex:true, _opacity:0.6 });
+
+  // ── PATJ Gorj — Căi Comunicații ─────────────────────────────────
+  createFgbLayer('patj_stare_drumuri',   'Stare Drumuri',           '#d35400', 'DATA/PATJ/PATJ_stare_drumuri.fgb',    { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_ocolitoare',      'Ocolitoare Existente',    '#e67e22', 'DATA/PATJ/PATJ_ocolitoare.fgb',       { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_ocolitoare_prop', 'Ocolitoare Propuse',      '#f39c12', 'DATA/PATJ/PATJ_ocolitoare_propuse.fgb',{ cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_transport_pub',   'Transport Public',        '#e8a838', 'DATA/PATJ/PATJ_transport_public.fgb', { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_noduri_rutiere',  'Noduri Rutiere',          '#ff6f00', 'DATA/PATJ/PATJ_noduri_rutiere.fgb',   { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_poduri',          'Poduri',                  '#a04000', 'DATA/PATJ/PATJ_poduri.fgb',           { cat:'patj_comunicatii', minZoom:10, _noIndex:true });
+  createFgbLayer('patj_aerodrom',        'Aerodrom',                '#1565c0', 'DATA/PATJ/PATJ_aerodrom.fgb',         { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_statii_ev',       'Stații Încărcare EV',     '#00897b', 'DATA/PATJ/PATJ_statii_EV.fgb',        { cat:'patj_comunicatii', minZoom:9, _noIndex:true });
+
+  // ── PATJ Gorj — Infrastructuri Tehnice ──────────────────────────
+  createFgbLayer('patj_conducte_gaze',   'Conducte Gaze',           '#fdd835', 'DATA/PATJ/PATJ_conducte_gaze.fgb',   { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_colectoare_romgaz','Colectoare ROMGAZ',      '#f9a825', 'DATA/PATJ/PATJ_colectoare_ROMGAZ.fgb',{ cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_conducte_conpet', 'Conducte CONPET',         '#6a1a4c', 'DATA/PATJ/PATJ_conducte_CONPET.fgb', { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_conducte_omv',    'Conducte OMV',            '#1a237e', 'DATA/PATJ/PATJ_conducte_OMV.fgb',    { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_transelectrica',  'Transelectrica PATJ',     '#e53935', 'DATA/PATJ/PATJ_transelectrica.fgb',  { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_producere_ee',    'Producere Energie Electrică','#ff7043','DATA/PATJ/PATJ_producere_EE.fgb', { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_aductiuni',       'Aducțiuni Apă',           '#0288d1', 'DATA/PATJ/PATJ_aductiuni.fgb',       { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_surse_subt',      'Surse Subterane Apă',     '#039be5', 'DATA/PATJ/PATJ_surse_subterane.fgb', { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_surse_supr',      'Surse Superficiale Apă',  '#0277bd', 'DATA/PATJ/PATJ_surse_superficiale.fgb',{ cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_fibra_optica',    'Fibră Optică PATJ',       '#00acc1', 'DATA/PATJ/PATJ_fibra_optica.fgb',    { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_deseuri',         'Infrastructură Deșeuri',  '#546e7a', 'DATA/PATJ/PATJ_infr_deseuri.fgb',    { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_sacet',           'Rețele SACET',            '#00796b', 'DATA/PATJ/PATJ_SACET.fgb',           { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_depozite_titei',  'Depozite Țiței',          '#4e342e', 'DATA/PATJ/PATJ_depozite_titei.fgb',  { cat:'patj_tehnic', minZoom:9, _noIndex:true });
+
+  // ── PATJ Gorj — Economic & Turism ───────────────────────────────
+  createFgbLayer('patj_zone_defavorizate','Zone Defavorizate',      '#1565c0', 'DATA/PATJ/PATJ_zone_defavorizate.fgb',{ cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
+  createFgbLayer('patj_profil_eco',      'Profil Economic Dominant','#2980b9', 'DATA/PATJ/PATJ_profil_economic.fgb', { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.65 });
+  createFgbLayer('patj_zone_functionale','Zonare Funcțională PATJ', '#3498db', 'DATA/PATJ/PATJ_zone_functionale.fgb',{ cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.55 });
+  createFgbLayer('patj_masuri_uatb',     'UATB Măsuri Integrate',   '#0097a7', 'DATA/PATJ/PATJ_masuri_UATB.fgb',    { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
+  createFgbLayer('patj_conflicte',       'Zone Potențiale Conflicte','#c62828','DATA/PATJ/PATJ_zone_conflicte.fgb', { cat:'patj_economic', minZoom:9, _noIndex:true, _opacity:0.6 });
+  createFgbLayer('patj_anrm',            'Exploatări ANRM',         '#6d4c41', 'DATA/PATJ/PATJ_exploatari_ANRM.fgb', { cat:'patj_economic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_turism_areal',    'Areal Potențial Turistic','#00838f', 'DATA/PATJ/PATJ_turism_areal.fgb',   { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.55 });
+  createFgbLayer('patj_partii_schi',     'Pârtii de Schi',          '#00bcd4', 'DATA/PATJ/PATJ_partii_schi.fgb',    { cat:'patj_economic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_statiuni',        'Stațiuni Turistice',      '#26c6da', 'DATA/PATJ/PATJ_statiuni.fgb',        { cat:'patj_economic', minZoom:9, _noIndex:true });
+  createFgbLayer('patj_uatb_turism',     'UATB Date Economice+Turism','#4dd0e1','DATA/PATJ/PATJ_UATB_turism.fgb',  { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
+  createFgbLayer('patj_resurse_sol',     'Resurse Sol și Subsol',   '#8d6e63', 'DATA/PATJ/PATJ_UATB_resurse_sol.fgb',{ cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
+
   renderTree();
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
