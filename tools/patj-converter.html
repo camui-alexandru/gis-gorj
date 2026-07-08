@@ -136,6 +136,7 @@ ol.steps{padding-left:18px;display:flex;flex-direction:column;gap:6px}
   <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button class="btn btn-green" id="btnConvert" onclick="startConvert()">⚙ Convertește Tot</button>
     <button class="btn btn-primary" id="btnZip" onclick="downloadZip()" disabled>📦 Descarcă ZIP (DATA/PATJ/)</button>
+    <button class="btn btn-secondary" id="btnIndividual" onclick="downloadIndividual()" disabled style="display:none">⬇ Descarcă fișiere individual</button>
     <span id="convertInfo" style="font-size:11px;color:var(--muted)"></span>
   </div>
 </div>
@@ -493,24 +494,75 @@ async function startConvert() {
 
   const okCount = Object.keys(fgbResults).length;
   log(`\n✓ Gata: ${okCount} fișiere FGB convertite.`, 'ok');
-  document.getElementById('btnZip').disabled = false;
-  document.getElementById('uploadCard').style.display = '';
-  document.getElementById('convertInfo').textContent = `${okCount} fișiere FGB pregătite`;
+  if (okCount > 0) {
+    document.getElementById('btnZip').disabled = false;
+    const btnInd = document.getElementById('btnIndividual');
+    btnInd.disabled = false;
+    btnInd.style.display = '';
+    document.getElementById('uploadCard').style.display = '';
+    document.getElementById('convertInfo').textContent = `${okCount} fișiere FGB pregătite`;
+  } else {
+    log('⚠ Niciun fișier FGB generat! Verifică că fișierele .shp sunt valide.', 'err');
+  }
   convertRunning = false;
 }
 
-async function downloadZip() {
-  if (!Object.keys(fgbResults).length) return;
-  const zip = new JSZip();
-  const folder = zip.folder('DATA').folder('PATJ');
-  for (const [name, data] of Object.entries(fgbResults)) {
-    folder.file(name, data);
+async function downloadIndividual() {
+  const entries = Object.entries(fgbResults);
+  if (!entries.length) { alert('Nu există fișiere convertite.'); return; }
+  log(`Descarc ${entries.length} fișiere individual...`, 'info');
+  for (const [name, data] of entries) {
+    const blob = new Blob([data], { type:'application/octet-stream' });
+    triggerDownload(blob, name);
+    await new Promise(r => setTimeout(r, 500));
+    log(`  ↓ ${name}`, 'ok');
   }
-  const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:3} });
+  log('✓ Toate descărcate. Pune-le în DATA/PATJ/ din repo.', 'ok');
+}
+
+function triggerDownload(blob, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'PATJ_FGB_Gorj.zip';
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 1000);
+}
+
+async function downloadZip() {
+  const entries = Object.entries(fgbResults);
+  if (!entries.length) {
+    alert('Nu există fișiere convertite. Apasă mai întâi "Convertește Tot".');
+    return;
+  }
+
+  // Încearcă JSZip
+  if (typeof JSZip !== 'undefined') {
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder('DATA').folder('PATJ');
+      for (const [name, data] of entries) folder.file(name, data);
+      log('Generez ZIP...', 'info');
+      const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:3} });
+      triggerDownload(blob, 'PATJ_FGB_Gorj.zip');
+      log(`✓ ZIP descărcat (${(blob.size/1024/1024).toFixed(1)} MB)`, 'ok');
+      return;
+    } catch(e) {
+      log('⚠ JSZip eroare: ' + e.message + ' — trec la descărcare individuală', 'err');
+    }
+  } else {
+    log('⚠ JSZip nu e disponibil — descarc fișierele individual', 'err');
+  }
+
+  // Fallback: descarcă fiecare FGB separat
+  log(`Descarc ${entries.length} fișiere individual...`, 'info');
+  for (const [name, data] of entries) {
+    const blob = new Blob([data], { type:'application/octet-stream' });
+    triggerDownload(blob, name);
+    await new Promise(r => setTimeout(r, 400));
+    log(`  ↓ ${name}`, 'ok');
+  }
+  log('✓ Toate fișierele descărcate.', 'ok');
 }
 </script>
 </body>
