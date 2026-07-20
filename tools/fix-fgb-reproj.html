@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Fix FGB Coordonate (Stereo70 → WGS84)</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0d1b2a; color:#cdd9e5; margin:0; padding:24px; }
+  h1 { font-size:18px; margin:0 0 6px; color:#58a6ff; }
+  p  { font-size:13px; color:#8b949e; margin:0 0 20px; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:20px; max-width:560px; }
+  .drop-zone {
+    border:2px dashed #30363d; border-radius:8px; padding:40px 20px;
+    text-align:center; cursor:pointer; transition:border-color .2s;
+    margin-bottom:16px;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color:#58a6ff; background:#1c2737; }
+  .drop-zone input { display:none; }
+  .drop-zone .hint { font-size:13px; color:#8b949e; margin-top:6px; }
+  button {
+    background:#238636; border:none; color:#fff; padding:8px 18px;
+    border-radius:6px; cursor:pointer; font-size:13px; margin-top:4px;
+  }
+  button:disabled { background:#21262d; color:#484f58; cursor:default; }
+  #log {
+    margin-top:14px; background:#010409; border:1px solid #21262d;
+    border-radius:6px; padding:10px; font-size:12px; font-family:monospace;
+    min-height:60px; max-height:240px; overflow-y:auto; white-space:pre-wrap;
+    color:#c9d1d9;
+  }
+  .ok  { color:#3fb950; }
+  .err { color:#f85149; }
+  .inf { color:#58a6ff; }
+  .warn { color:#e3b341; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔧 Fix FGB — Stereo70 → WGS84</h1>
+  <p>Deschide un fișier <b>.fgb</b> cu coordonate greșite (Stereo70/EPSG:31700) și descarcă versiunea corectată în WGS84.</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div>📂 Drag & drop fișier <b>.fgb</b> sau click pentru selectare</div>
+    <div class="hint">ex: PATJ_statii_EV.fgb</div>
+    <input type="file" id="fileInput" accept=".fgb">
+  </div>
+
+  <button id="btnFix" disabled>Reproiectează &amp; Descarcă</button>
+
+  <div id="log"><span class="inf">Aștept fișier...</span></div>
+</div>
+
+<!-- Libraries via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.9.0/dist/proj4.js"></script>
+<script>
+// Stereo70 definition
+proj4.defs('EPSG:31700',
+  '+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 ' +
+  '+ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs');
+
+const log = (msg, cls='') => {
+  const el = document.getElementById('log');
+  el.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+};
+const clearLog = () => { document.getElementById('log').innerHTML = ''; };
+
+let selectedFile = null;
+
+// Drop zone wiring
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  dropZone.querySelector('div').textContent = `✅ ${f.name} (${(f.size/1024/1024).toFixed(2)} MB)`;
+  document.getElementById('btnFix').disabled = false;
+  clearLog();
+  log(`Fișier selectat: ${f.name}`, 'ok');
+}
+
+// Detect if coords look like Stereo70 (projected, metres)
+function looksLikeStereo70(coords) {
+  // Stereo70: x ≈ 200000–900000, y ≈ 200000–900000
+  const flat = coords.flat(Infinity);
+  if (flat.length < 2) return false;
+  const x = flat[0], y = flat[1];
+  return (x > 100000 && x < 1000000 && y > 100000 && y < 1000000);
+}
+
+function reprojectCoords(coords, depth) {
+  if (typeof coords[0] === 'number') {
+    // single point [x, y] or [x, y, z]
+    const [lon, lat] = proj4('EPSG:31700', 'EPSG:4326', [coords[0], coords[1]]);
+    return coords.length > 2 ? [lon, lat, coords[2]] : [lon, lat];
+  }
+  return coords.map(c => reprojectCoords(c, depth - 1));
+}
+
+function reprojectGeometry(geom) {
+  if (!geom || !geom.type) return geom;
+  const g = { ...geom };
+  if (geom.type === 'GeometryCollection') {
+    g.geometries = geom.geometries.map(reprojectGeometry);
+  } else {
+    g.coordinates = reprojectCoords(geom.coordinates, 5);
+  }
+  return g;
+}
+
+document.getElementById('btnFix').addEventListener('click', async () => {
+  if (!selectedFile) return;
+  clearLog();
+  log(`Citesc ${selectedFile.name}...`, 'inf');
+
+  try {
+    const arrayBuf = await selectedFile.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuf);
+
+    log('Deserializez FGB...', 'inf');
+    const features = [];
+    let headerMeta = null;
+
+    // flatgeobuf-geojson.min.js exposes window.flatgeobuf
+    const fb = window.flatgeobuf;
+    if (!fb) throw new Error('Biblioteca flatgeobuf nu s-a încărcat (CDN blocat?). Încearcă dintr-un browser cu internet activ.');
+
+    // deserialize returns an async iterator
+    for await (const feature of fb.deserialize(uint8)) {
+      features.push(feature);
+    }
+    log(`  ${features.length} elemente citite.`, 'ok');
+
+    if (features.length === 0) throw new Error('Nicio geometrie găsită în fișier.');
+
+    // Check if reprojection is needed
+    const firstGeom = features[0]?.geometry;
+    const firstCoords = firstGeom?.coordinates ?? firstGeom?.geometries?.[0]?.coordinates;
+    const needsReproj = firstCoords && looksLikeStereo70(firstCoords.flat ? firstCoords.flat(Infinity) : firstCoords);
+
+    if (needsReproj) {
+      log('Detectat Stereo70 — reproiectez în WGS84...', 'warn');
+    } else {
+      log('Coordonatele par deja WGS84 (lon/lat). Continui oricum cu reproiecția forțată.', 'warn');
+    }
+
+    // Reproject all features
+    const reprojected = features.map(f => ({
+      ...f,
+      geometry: reprojectGeometry(f.geometry)
+    }));
+
+    // Verify result
+    const ck = reprojected[0]?.geometry?.coordinates?.flat?.(Infinity) ?? [];
+    if (ck.length >= 2) {
+      log(`Verificare: primul punct → lon=${ck[0].toFixed(5)}, lat=${ck[1].toFixed(5)}`, 'ok');
+      if (ck[0] < -20 || ck[0] > 60 || ck[1] < 30 || ck[1] > 70) {
+        log('⚠ Coordonatele rezultate par în afara României — verifică manual!', 'err');
+      } else {
+        log('✅ Coordonate OK (România)', 'ok');
+      }
+    }
+
+    // Serialize back to FGB
+    log('Serializez înapoi în FGB...', 'inf');
+    const fc = { type: 'FeatureCollection', features: reprojected };
+    const outBytes = fb.serialize(fc);
+    log(`  Dimensiune output: ${(outBytes.byteLength / 1024).toFixed(1)} KB`, 'ok');
+
+    // Download
+    const blob = new Blob([outBytes], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = selectedFile.name.replace(/\.fgb$/i, '') + '_WGS84.fgb';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 3000);
+
+    log(`\n✅ Descărcat: ${a.download}`, 'ok');
+    log('Redenumește fișierul la numele original și încarcă-l pe GitHub (DATA/PATJ/).', 'inf');
+
+  } catch (err) {
+    log(`\n❌ Eroare: ${err.message}`, 'err');
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>
