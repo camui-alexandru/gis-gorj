@@ -1171,6 +1171,9 @@ document.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════════════
 // ATTRIBUTES
 // ═══════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 function showAttr(feature, layer) {
   const props = feature.properties || {};
   const nationalC = getNationalC(props);
@@ -1196,9 +1199,9 @@ function showAttr(feature, layer) {
     document.getElementById('attrLayerName').textContent = utrAfisare || layer.name;
     document.getElementById('attrGeomType').textContent  = utr || 'Zonă funcțională';
     const entries = Object.entries(props).filter(([,v]) => v != null && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'null');
-    let html = '<table class="attr-tbl"><tbody>' + entries.map(([k,v]) => `<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('') + '</tbody></table>';
+    let html = '<table class="attr-tbl"><tbody>' + entries.map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('') + '</tbody></table>';
     if (utrPug) {
-      html += `<button onclick="loadRegimTehnic('${utrPug.replace(/'/g,"\\'")}') " style="width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">📋 Extinde regim tehnic</button>`;
+      html += `<button data-utrpug="${escapeHtml(utrPug)}" onclick="loadRegimTehnic(this.dataset.utrpug)" style="width:100%;margin-top:8px;padding:10px;background:#8e44ad;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">📋 Extinde regim tehnic</button>`;
       html += '<div id="regimTehnicContent"></div>';
     }
     scroll.innerHTML = html;
@@ -1231,7 +1234,7 @@ function showAttr(feature, layer) {
     scroll.innerHTML = entries.length === 0
       ? '<div class="attr-empty">Niciun atribut disponibil</div>'
       : `<table class="attr-tbl"><tbody>${entries.map(([k,v]) =>
-          `<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</tbody></table>`;
+          `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('')}</tbody></table>`;
   }
 
   document.getElementById('attrPanel').classList.remove('hidden');
@@ -1317,8 +1320,8 @@ function setFiles(files) {
     const warn = !selectedFiles.dbf ? '<div class="warn-dbf">⚠ Fără .dbf — atributele nu vor fi disponibile</div>' : '';
     document.getElementById('dropContent').innerHTML = `
       <div class="file-icon">📄</div>
-      <div class="file-info">${selectedFiles.shp.name}</div>
-      <div class="file-size">${parts.join(', ')}</div>${warn}`;
+      <div class="file-info">${escapeHtml(selectedFiles.shp.name)}</div>
+      <div class="file-size">${escapeHtml(parts.join(', '))}</div>${warn}`;
     document.getElementById('dropZone').classList.add('has-file');
     if (!document.getElementById('layerNameInput').value)
       document.getElementById('layerNameInput').value = selectedFiles.shp.name.replace(/\.shp$/i,'');
@@ -1328,7 +1331,7 @@ function setFiles(files) {
     if (!['zip','dxf'].includes(ext)) { showErr('Format nesupitat.'); return; }
     document.getElementById('dropContent').innerHTML = `
       <div class="file-icon">📄</div>
-      <div class="file-info">${selectedFile.name}</div>
+      <div class="file-info">${escapeHtml(selectedFile.name)}</div>
       <div class="file-size">${(selectedFile.size/1024).toFixed(1)} KB</div>`;
     document.getElementById('dropZone').classList.add('has-file');
     if (!document.getElementById('layerNameInput').value)
@@ -1959,6 +1962,7 @@ const ArcGISDynamic = L.Layer.extend({
       '?msg=&idStrat=0&den_strat=null&den_regulament=' + encodeURIComponent(utrPug);
     const htmlUrl = 'https://gis.cjgorj.ro/urbanism/PUG_ZONE_INFO.jsp?zona=' + encodeURIComponent(utrPug);
     const label = utrPug.replace(/_/g,' ').toUpperCase();
+    const labelEsc = escapeHtml(label);
 
     const CSS =
       '*{margin:0;padding:0;box-sizing:border-box}' +
@@ -1980,20 +1984,21 @@ const ArcGISDynamic = L.Layer.extend({
 
     function buildHTML(text) {
       var lines = text.split(/\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
-      var out = '<div class="zt">' + label + '</div>', inUl = false;
+      var out = '<div class="zt">' + escapeHtml(label) + '</div>', inUl = false;
       for (var i = 0; i < lines.length; i++) {
         var ln = lines[i];
         var isSect = /^SEC[TȚ]IUNEA\b/i.test(ln) || /^CAPITOLUL\b/i.test(ln);
         var isArt  = /^ARTICOLUL\b/i.test(ln);
         var isGen  = /^GENERALIT[AĂ][TȚ]I\b/i.test(ln) || /^SUBCAPITOL/i.test(ln);
         var isBul  = /^[•●‣◦]\s/.test(ln) || (/^\s*-\s/.test(ln) && !/^\s*-\s*$/.test(ln));
+        var lnEsc = escapeHtml(ln.replace(/^\s*[•●‣◦\-–]\s*/, ''));
         if (inUl && !isBul) { out += '</ul>'; inUl = false; }
-        if (isSect || isGen) out += '<h2>' + ln + '</h2>';
-        else if (isArt)      out += '<h3>' + ln + '</h3>';
+        if (isSect || isGen) out += '<h2>' + escapeHtml(ln) + '</h2>';
+        else if (isArt)      out += '<h3>' + escapeHtml(ln) + '</h3>';
         else if (isBul) {
           if (!inUl) { out += '<ul>'; inUl = true; }
-          out += '<li>' + ln.replace(/^\s*[•●‣◦\-–]\s*/, '') + '</li>';
-        } else out += '<p>' + ln + '</p>';
+          out += '<li>' + lnEsc + '</li>';
+        } else out += '<p>' + escapeHtml(ln) + '</p>';
       }
       if (inUl) out += '</ul>';
       return out;
@@ -2027,8 +2032,8 @@ const ArcGISDynamic = L.Layer.extend({
       var w = window.open('','_blank','width=960,height=750,scrollbars=yes,resizable=yes');
       if (!w) return;
       w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
-        label + '</title><style>' + CSS + '</style></head><body>' +
-        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
+        labelEsc + '</title><style>' + CSS + '</style></head><body>' +
+        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
         '<div class="bd">' + buildHTML(text) + '</div></body></html>');
       w.document.close();
     }
@@ -2036,8 +2041,8 @@ const ArcGISDynamic = L.Layer.extend({
     function openFallback(w) {
       w.document.open();
       w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
-        label + '</title><style>' + CSS + '</style></head><body>' +
-        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
+        labelEsc + '</title><style>' + CSS + '</style></head><body>' +
+        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
         '<div class="fw"><iframe src="' + htmlUrl + '"></iframe></div>' +
         '</body></html>');
       w.document.close();
@@ -2047,7 +2052,7 @@ const ArcGISDynamic = L.Layer.extend({
     if (!w) return;
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Se încarcă…</title>' +
       '<style>' + CSS + '</style></head><body>' +
-      '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
+      '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
       '<div class="bd"><p style="color:#94a3b8">Se încarcă regulamentul…</p></div></body></html>');
 
     fetch(xmlUrl)
@@ -2057,8 +2062,8 @@ const ArcGISDynamic = L.Layer.extend({
         if (!text || text.trim().length < 20) { openFallback(w); return; }
         w.document.open();
         w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
-          label + '</title><style>' + CSS + '</style></head><body>' +
-          '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + label + '</div>' +
+          labelEsc + '</title><style>' + CSS + '</style></head><body>' +
+          '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
           '<div class="bd">' + buildHTML(text) + '</div></body></html>');
         w.document.close();
       })
@@ -2196,7 +2201,7 @@ function runCadSearch() {
 
   const sirutaCodes = uatRaw ? findSirutaCodes(uatRaw) : null;
   if (sirutaCodes && sirutaCodes.size === 0) {
-    resultsEl.innerHTML = `<div class="no-results">UAT-ul <strong>"${uatRaw}"</strong> nu a fost găsit în județul Gorj.</div>`;
+    resultsEl.innerHTML = `<div class="no-results">UAT-ul <strong>"${escapeHtml(uatRaw)}"</strong> nu a fost găsit în județul Gorj.</div>`;
     return;
   }
 
@@ -2220,7 +2225,7 @@ function runCadSearch() {
     }
 
     if (results.length === 0) {
-      resultsEl.innerHTML = `<div class="no-results">Niciun rezultat pentru nr. <strong>${nrRaw}</strong>${uatRaw ? ` în <strong>${uatRaw}</strong>` : ''}.</div>`;
+      resultsEl.innerHTML = `<div class="no-results">Niciun rezultat pentru nr. <strong>${escapeHtml(nrRaw)}</strong>${uatRaw ? ` în <strong>${escapeHtml(uatRaw)}</strong>` : ''}.</div>`;
       return;
     }
 
@@ -2231,10 +2236,10 @@ function runCadSearch() {
       return `<div class="result-item" id="ri_${i}" onclick="zoomToResult(${i})">
         <div class="ri-top">
           <span class="ri-badge">#${i+1}</span>
-          <span class="ri-name">Nr. ${r.nc}</span>
+          <span class="ri-name">Nr. ${escapeHtml(r.nc)}</span>
           <span class="ri-layer">Parcele</span>
         </div>
-        <div class="ri-layer" style="margin-bottom:3px">📍 ${uatName}</div>
+        <div class="ri-layer" style="margin-bottom:3px">📍 ${escapeHtml(uatName)}</div>
       </div>`;
     }).join('') + (results.length === 50
       ? '<div class="search-hint" style="padding:8px 0">Primele 50 rezultate — refinează căutarea.</div>' : '');
@@ -2264,7 +2269,7 @@ function runCadSearch() {
   }
 
   if (results.length === 0) {
-    resultsEl.innerHTML = `<div class="no-results">Niciun rezultat${nrRaw ? ` pentru <strong>${nrRaw}</strong>` : ''}.</div>`;
+    resultsEl.innerHTML = `<div class="no-results">Niciun rezultat${nrRaw ? ` pentru <strong>${escapeHtml(nrRaw)}</strong>` : ''}.</div>`;
     return;
   }
   window._cadResults = results;
@@ -2274,8 +2279,8 @@ function runCadSearch() {
     const au = getAdminUnit(props);
     const uatName = au ? (SIRUTA_GORJ[Number(au)] || au) : '—';
     return `<div class="result-item" id="ri_${i}" onclick="zoomToResult(${i})">
-      <div class="ri-top"><span class="ri-badge">#${i+1}</span><span class="ri-name">Nr. ${cadNr}</span><span class="ri-layer">${r.layer.name}</span></div>
-      <div class="ri-layer" style="margin-bottom:3px">📍 ${uatName}</div>
+      <div class="ri-top"><span class="ri-badge">#${i+1}</span><span class="ri-name">Nr. ${escapeHtml(cadNr)}</span><span class="ri-layer">${escapeHtml(r.layer.name)}</span></div>
+      <div class="ri-layer" style="margin-bottom:3px">📍 ${escapeHtml(uatName)}</div>
     </div>`;
   }).join('');
 }
