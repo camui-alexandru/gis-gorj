@@ -532,18 +532,18 @@ function logout(){
 const CATEGORIES = [
   { id:'cadastru',         icon:'📍', label:'Cadastru',               color:'#e8a838' },
   { id:'urbanism',         icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
-  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
-  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
-  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
-  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
-  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
   { id:'drumuri',          icon:'🛣', label:'Transport',               color:'#e74c3c' },
   { id:'utilitati',        icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport',        icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
   { id:'mediu',            icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
   { id:'proiecte',         icon:'📐', label:'Proiecte',                color:'#ff7043' },
   { id:'altele',           icon:'📋', label:'Altele',                  color:'#7f8c8d' },
+  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
+  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
+  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
+  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
+  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
+  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
 ];
 
 
@@ -614,7 +614,7 @@ function rendererStyle(renderer, feature, hovered, opacityMult = 1) {
 }
 
 const CAT_STATE = {}; // { catId: { open: bool } }
-CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: true });
+CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: c.id !== 'patj' });
 const GROUP_STATE = {};
 
 let layers = []; // { id, name, cat, color, format, geojson, visible, leafletLayer }
