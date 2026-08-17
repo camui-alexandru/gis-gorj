@@ -1770,6 +1770,15 @@ const ORD904_REG_LINK = {
   ZonaReglementareSuplimentara: { general:'Cod_ZRS', detail:'Cod_ZRS_D' },
 };
 
+// Ordinea de adăugare pe hartă (de jos în sus): ultimul din listă e deasupra și
+// primește click-ul întâi când zonele se suprapun. ZFPropusa e pusă deasupra
+// ZonaReglementareSuplimentara ca să răspundă ea prima la click pe zonele propuse.
+const ORD904_ZORDER = [
+  'LimitaIntravilanExistenta', 'LimitaIntravilanPropusa', 'PlanSpatial',
+  'ZFExistenta', 'ZonaReglementareSuplimentara', 'ZFPropusa',
+  'ReteleTehnicoEdilitare', 'CaiComunicatie', 'ReglementariUrbanisticePunct',
+];
+
 function openOrd904() { document.getElementById('ord904Modal').classList.remove('hidden'); }
 function closeOrd904() {
   document.getElementById('ord904Modal').classList.add('hidden');
@@ -1996,8 +2005,12 @@ async function addOrd904LayersToMap() {
   addBtn.disabled = true;
   addBtn.textContent = 'Se adaugă…';
 
+  const orderedNames = ORD904_ZORDER.filter(t => ord904ParsedLayers[t]);
+  for (const t of Object.keys(ord904ParsedLayers)) if (!orderedNames.includes(t)) orderedNames.push(t);
+
   deferTreeRender = true;
-  for (const [tableName, fc] of Object.entries(ord904ParsedLayers)) {
+  for (const tableName of orderedNames) {
+    const fc = ord904ParsedLayers[tableName];
     const reprojected = await reprojectAsync(fc, fromEpsg);
     const layerObj = {
       id: 'ord904_' + tableName + '_' + Date.now(),
