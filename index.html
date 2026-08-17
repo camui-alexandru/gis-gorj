@@ -1251,10 +1251,59 @@ document.addEventListener('click', () => {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
+
+// CSS pentru ferestrele stilizate de "regim tehnic" (PUG static + documentație Ord. 904/2023)
+const REGIM_TEHNIC_CSS =
+  '*{margin:0;padding:0;box-sizing:border-box}' +
+  'body{background:#0f172a;color:#cbd5e1;font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.75}' +
+  '.hdr{padding:12px 20px;background:#1e293b;font-size:15px;font-weight:700;color:#e2e8f0;' +
+    'border-bottom:2px solid #38bdf8;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:1}' +
+  '.hdr .ic{color:#38bdf8;font-size:18px}' +
+  '.bd{padding:24px 28px 40px;max-width:920px;margin:0 auto}' +
+  '.zt{font-size:18px;font-weight:700;color:#38bdf8;margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid #334155}' +
+  'h2{font-size:15px;font-weight:700;color:#7dd3fc;margin:24px 0 10px;padding:8px 12px;' +
+    'background:#1e293b;border-left:3px solid #38bdf8;border-radius:4px;text-transform:uppercase;letter-spacing:.5px}' +
+  'h3{font-size:14px;font-weight:700;color:#e2e8f0;margin:18px 0 8px;padding-left:14px;border-left:2px solid #475569}' +
+  'p{margin:4px 0 4px 16px;text-align:justify}' +
+  'ul{margin:6px 0 6px 32px;list-style:none}' +
+  'ul li{position:relative;padding-left:16px;margin:3px 0}' +
+  'ul li::before{content:"\\2022";color:#38bdf8;font-weight:700;position:absolute;left:0}' +
+  '.fw{height:calc(100vh - 50px);background:#1a1f2e}' +
+  '.fw iframe{width:100%;height:100%;border:none;filter:invert(0.88) hue-rotate(180deg) contrast(0.85);background:#fff}' +
+  '.kv{display:grid;grid-template-columns:180px 1fr;gap:4px 12px;margin:4px 0 4px 16px}' +
+  '.kv dt{color:#7dd3fc;font-weight:600}' +
+  '.kv dd{color:#cbd5e1}' +
+  '.empty{color:#64748b;font-style:italic;margin:4px 0 4px 16px}';
+
 function showAttr(feature, layer) {
   const props = feature.properties || {};
   const nationalC = getNationalC(props);
   const scroll = document.getElementById('attrScroll');
+
+  // Mod documentație Ord. 904/2023: regim tehnic citit din tabelele de regulament ale aceluiași .gpkg
+  if (layer._ord904RegKey) {
+    document.getElementById('attrHdr').style.borderLeftColor = layer.color;
+    document.getElementById('attrLayerName').textContent = layer.name;
+    document.getElementById('attrGeomType').textContent = feature.geometry?.type || '—';
+    const entries = Object.entries(props).filter(([,v]) => v !== null && v !== undefined && v !== '');
+    let html = entries.length === 0
+      ? '<div class="attr-empty">Niciun atribut disponibil</div>'
+      : `<table class="attr-tbl"><tbody>${entries.map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('')}</tbody></table>`;
+    const codeGeneral = props[layer._ord904RegKey.general];
+    const codeDetail  = props[layer._ord904RegKey.detail];
+    const hasCode = (codeGeneral != null && String(codeGeneral).trim() !== '') || (codeDetail != null && String(codeDetail).trim() !== '');
+    if (hasCode) {
+      html += `<button id="ord904RegBtn" style="width:100%;margin-top:8px;padding:10px;background:${layer.color};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">📋 Extinde regim tehnic</button>`;
+    }
+    scroll.innerHTML = html;
+    if (hasCode) {
+      document.getElementById('ord904RegBtn').addEventListener('click', () => {
+        ord904ShowRegimTehnic(layer._ord904Regulations, codeGeneral, codeDetail, layer.name);
+      });
+    }
+    document.getElementById('attrPanel').classList.remove('hidden');
+    return;
+  }
 
   // Mod PUG: afișaj special cu regim tehnic
   if (layer._isPug) {
@@ -1711,7 +1760,15 @@ function ord904DecodeGeomBlob(blob) {
 
 let ord904Db = null;
 let ord904ParsedLayers = null; // { tableName: FeatureCollection }
+let ord904Regulations = null; // { RegulamentLocalUrbanism: [...], RegulamentLocalUrbanismDetaliat: [...] }
 let ord904SrsFound = null;
+
+// Cod folosit pe zonă (ZF/ZRS) → codul din tabelele de regulament pentru a lega o zonă de textul regimului tehnic
+const ORD904_REG_LINK = {
+  ZFExistenta:                  { general:'Cod_ZF',  detail:'Cod_SZF' },
+  ZFPropusa:                    { general:'Cod_ZF',  detail:'Cod_SZF' },
+  ZonaReglementareSuplimentara: { general:'Cod_ZRS', detail:'Cod_ZRS_D' },
+};
 
 function openOrd904() { document.getElementById('ord904Modal').classList.remove('hidden'); }
 function closeOrd904() {
@@ -1727,7 +1784,7 @@ function closeOrd904() {
   document.getElementById('ord904DropContent').innerHTML =
     '<div class="drop-icon">📦</div><div class="drop-text">Trage fișierul .gpkg aici sau click</div>' +
     '<div class="drop-hint">GeoPackage (v1.2.0 / v1.3.1) — set de date spațiale PUG/PUZ/PUD/PATJ</div>';
-  ord904Db = null; ord904ParsedLayers = null; ord904SrsFound = null;
+  ord904Db = null; ord904ParsedLayers = null; ord904Regulations = null; ord904SrsFound = null;
 }
 function handleOrd904Overlay(e) { if (e.target === e.currentTarget) closeOrd904(); }
 function handleOrd904DragOver(e)  { e.preventDefault(); document.getElementById('ord904DropZone').classList.add('drag-over'); }
@@ -1780,9 +1837,10 @@ async function processOrd904File(file) {
     const db = new SQL.Database(buf);
     progFill.style.width = '55%';
     ord904Db = db;
-    const { report, verdict, layers } = ord904Validate(db);
+    const { report, verdict, layers, regulations } = ord904Validate(db);
     progFill.style.width = '100%';
     ord904ParsedLayers = layers;
+    ord904Regulations = regulations;
     renderOrd904Report(report, verdict);
     document.getElementById('ord904AddBtn').disabled = !layers || !Object.keys(layers).length;
   } catch (err) {
@@ -1795,6 +1853,7 @@ async function processOrd904File(file) {
 function ord904Validate(db) {
   const report = []; // { table, level:'ok'|'warn'|'err', lines:[...] }
   const layers = {};
+  const regulations = {}; // { RegulamentLocalUrbanism: [rows...], RegulamentLocalUrbanismDetaliat: [rows...] }
   let hardErrors = 0, warnings = 0;
 
   const contents = [];
@@ -1886,6 +1945,25 @@ function ord904Validate(db) {
         report[report.length - 1].lines.push('Eroare la citirea geometriilor: ' + (e.message || e));
       }
     }
+
+    // Extragem rândurile complete pentru tabelele de regulament (fără geometrie),
+    // folosite pentru afișarea regimului tehnic la click pe o zonă
+    if (!spec.geomType && count > 0) {
+      try {
+        const sel = db.exec(`SELECT ${fieldNames.map(c => `"${c}"`).join(',')} FROM "${tableName}"`);
+        const rows = [];
+        if (sel[0]) {
+          for (const row of sel[0].values) {
+            const obj = {};
+            fieldNames.forEach((c, i) => { obj[c] = row[i]; });
+            rows.push(obj);
+          }
+        }
+        regulations[tableName] = rows;
+      } catch(e) {
+        report[report.length - 1].lines.push('Eroare la citirea regulamentului: ' + (e.message || e));
+      }
+    }
   }
 
   const verdict = hardErrors > 0
@@ -1894,7 +1972,7 @@ function ord904Validate(db) {
       ? { level:'warn', text:`⚠ Conform structural, cu ${warnings} observaț${warnings===1?'ie':'ii'} (vezi detalii mai jos).` }
       : { level:'ok', text:'✓ Structură conformă cu setul minim de 11 straturi din Ord. MDLPA 904/2023.' };
 
-  return { report, verdict, layers };
+  return { report, verdict, layers, regulations };
 }
 
 function renderOrd904Report(report, verdict) {
@@ -1912,6 +1990,7 @@ async function addOrd904LayersToMap() {
   const uat = document.getElementById('ord904Uat').value.trim() || 'UAT necunoscut';
   const tip = document.getElementById('ord904Tip').value;
   const fromEpsg = (ord904SrsFound === 31700) ? 'EPSG:31700' : 'EPSG:3844';
+  const regulations = ord904Regulations; // păstrăm referința — closeOrd904() o resetează la final
 
   const addBtn = document.getElementById('ord904AddBtn');
   addBtn.disabled = true;
@@ -1920,7 +1999,7 @@ async function addOrd904LayersToMap() {
   deferTreeRender = true;
   for (const [tableName, fc] of Object.entries(ord904ParsedLayers)) {
     const reprojected = await reprojectAsync(fc, fromEpsg);
-    addLayer({
+    const layerObj = {
       id: 'ord904_' + tableName + '_' + Date.now(),
       name: `${tip} ${uat} — ${tableName}`,
       cat: 'documentatie',
@@ -1928,12 +2007,75 @@ async function addOrd904LayersToMap() {
       format: 'GPKG',
       geojson: reprojected,
       visible: true,
-    });
+    };
+    const regKey = ORD904_REG_LINK[tableName];
+    if (regKey && regulations && (regulations.RegulamentLocalUrbanism?.length || regulations.RegulamentLocalUrbanismDetaliat?.length)) {
+      layerObj._ord904RegKey = regKey;
+      layerObj._ord904Regulations = regulations;
+    }
+    addLayer(layerObj);
   }
   deferTreeRender = false;
   renderTree();
 
   closeOrd904();
+}
+
+const ORD904_REG_FIELD_LABELS = {
+  Tip_zona:'Tip zonă', Tip_ZF_ZRS:'Tip ZF/ZRS', Tip_SZF_ZRS_D:'Tip subzonă',
+  Utiliz_admise:'Utilizări admise', Utiliz_admise_cond:'Utilizări admise condiționat', Utiliz_interzise:'Utilizări interzise',
+  Parc_desc:'Descriere parcelare', Clad_aliniament:'Amplasare față de aliniament',
+  Clad_limite_parcele:'Amplasare față de limitele parcelei', Clad_poz:'Amplasarea clădirilor pe aceeași parcelă',
+  Parc_acces:'Accese', Parc_stat:'Staționare', Clad_Hmax:'Înălțime maximă (m)', Clad_RHmax:'Regim maxim de înălțime',
+  Clad_aspect_ext:'Aspect exterior', Parc_edilitar:'Echipare edilitară', Parc_sp_verzi:'Spații verzi',
+  Parc_imprejmuiri:'Împrejmuiri', POT:'POT (%)', CUT:'CUT',
+};
+
+// Regim tehnic pentru straturile din documentația Ord. 904/2023 — spre deosebire de PUG-ul static
+// (care cere textul de la gis.cjgorj.ro), aici regulamentul e citit direct din tabelele
+// RegulamentLocalUrbanism / RegulamentLocalUrbanismDetaliat din același .gpkg încărcat de utilizator.
+// Legătura zonă → regulament se face după codul zonei (Cod_ZF/Cod_ZRS ↔ Cod_ZF_ZRS,
+// Cod_SZF/Cod_ZRS_D ↔ Cod_SZF_ZRS_D) — dedusă din denumirea câmpurilor din șablonul MDLPA.
+function ord904ShowRegimTehnic(regulations, codeGeneral, codeDetail, zoneLabel) {
+  const cg = codeGeneral != null ? String(codeGeneral).trim() : '';
+  const cd = codeDetail != null ? String(codeDetail).trim() : '';
+  const gen = cg ? (regulations?.RegulamentLocalUrbanism || []).find(r => String(r.Cod_ZF_ZRS ?? '').trim() === cg) : null;
+  const det = cd ? (regulations?.RegulamentLocalUrbanismDetaliat || []).find(r => String(r.Cod_SZF_ZRS_D ?? '').trim() === cd) : null;
+
+  function kvBlock(row, fields) {
+    const items = fields
+      .filter(f => row[f] != null && String(row[f]).trim() !== '')
+      .map(f => `<dt>${escapeHtml(ORD904_REG_FIELD_LABELS[f] || f)}</dt><dd>${escapeHtml(row[f])}</dd>`);
+    return items.length ? `<dl class="kv">${items.join('')}</dl>` : '';
+  }
+
+  let body = '';
+  if (gen) {
+    body += `<h2>Regulament general — ${escapeHtml(gen.Cod_ZF_ZRS ?? cg)}</h2>`;
+    body += kvBlock(gen, ['Tip_zona','Tip_ZF_ZRS']);
+    if (gen.Desc_ZF_ZRS) body += `<p>${escapeHtml(gen.Desc_ZF_ZRS)}</p>`;
+  }
+  if (det) {
+    body += `<h2>Regulament detaliat — ${escapeHtml(det.Cod_SZF_ZRS_D ?? cd)}</h2>`;
+    body += kvBlock(det, ['Tip_zona','Tip_SZF_ZRS_D','Clad_Hmax','Clad_RHmax','POT','CUT']);
+    if (det.Desc_SZF_ZRS_D) body += `<p>${escapeHtml(det.Desc_SZF_ZRS_D)}</p>`;
+    const utiliz = kvBlock(det, ['Utiliz_admise','Utiliz_admise_cond','Utiliz_interzise']);
+    if (utiliz) body += '<h3>Utilizări</h3>' + utiliz;
+    const conditii = kvBlock(det, ['Parc_desc','Clad_aliniament','Clad_limite_parcele','Clad_poz','Parc_acces','Parc_stat','Clad_aspect_ext','Parc_edilitar','Parc_sp_verzi','Parc_imprejmuiri']);
+    if (conditii) body += '<h3>Condiții de construire</h3>' + conditii;
+  }
+  if (!gen && !det) {
+    body = `<div class="empty">Nu s-a găsit regim tehnic asociat codului ${escapeHtml(cg || cd || '—')} în tabelele RegulamentLocalUrbanism / RegulamentLocalUrbanismDetaliat din acest GeoPackage.</div>`;
+  }
+
+  const labelEsc = escapeHtml(zoneLabel || cg || cd || 'zonă');
+  const w = window.open('', '_blank', 'width=760,height=700,scrollbars=yes,resizable=yes');
+  if (!w) return;
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
+    labelEsc + '</title><style>' + REGIM_TEHNIC_CSS + '</style></head><body>' +
+    '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
+    '<div class="bd"><div class="zt">' + labelEsc + '</div>' + body + '</div></body></html>');
+  w.document.close();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2373,23 +2515,7 @@ const ArcGISDynamic = L.Layer.extend({
     const label = utrPug.replace(/_/g,' ').toUpperCase();
     const labelEsc = escapeHtml(label);
 
-    const CSS =
-      '*{margin:0;padding:0;box-sizing:border-box}' +
-      'body{background:#0f172a;color:#cbd5e1;font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.75}' +
-      '.hdr{padding:12px 20px;background:#1e293b;font-size:15px;font-weight:700;color:#e2e8f0;' +
-        'border-bottom:2px solid #38bdf8;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:1}' +
-      '.hdr .ic{color:#38bdf8;font-size:18px}' +
-      '.bd{padding:24px 28px 40px;max-width:920px;margin:0 auto}' +
-      '.zt{font-size:18px;font-weight:700;color:#38bdf8;margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid #334155}' +
-      'h2{font-size:15px;font-weight:700;color:#7dd3fc;margin:24px 0 10px;padding:8px 12px;' +
-        'background:#1e293b;border-left:3px solid #38bdf8;border-radius:4px;text-transform:uppercase;letter-spacing:.5px}' +
-      'h3{font-size:14px;font-weight:700;color:#e2e8f0;margin:18px 0 8px;padding-left:14px;border-left:2px solid #475569}' +
-      'p{margin:4px 0 4px 16px;text-align:justify}' +
-      'ul{margin:6px 0 6px 32px;list-style:none}' +
-      'ul li{position:relative;padding-left:16px;margin:3px 0}' +
-      'ul li::before{content:"\\2022";color:#38bdf8;font-weight:700;position:absolute;left:0}' +
-      '.fw{height:calc(100vh - 50px);background:#1a1f2e}' +
-      '.fw iframe{width:100%;height:100%;border:none;filter:invert(0.88) hue-rotate(180deg) contrast(0.85);background:#fff}';
+    const CSS = REGIM_TEHNIC_CSS;
 
     function buildHTML(text) {
       var lines = text.split(/\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
