@@ -231,6 +231,24 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .cp-swatch:hover,.cp-swatch.sel{border-color:#fff}
 .cp-custom{width:100%;height:24px;border:none;border-radius:4px;cursor:pointer;background:none;padding:0}
 
+/* ── ORDIN 904/2023 — DOCUMENTAȚIE URBANISM ───────────────────────── */
+.ord-modal{width:620px}
+.ord-meta-row{display:flex;gap:8px}
+.ord-meta-row .form-row{flex:1}
+.ord-verdict{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ord-verdict.ok{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.35);color:#6fe3a0}
+.ord-verdict.warn{background:rgba(232,168,56,.12);border:1px solid rgba(232,168,56,.35);color:#f0c674}
+.ord-verdict.err{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);color:#ff8a8a}
+.ord-report{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto}
+.ord-row{border:1px solid var(--border);border-radius:6px;padding:7px 10px}
+.ord-row-hdr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.ord-row-hdr .ic{font-size:13px}
+.ord-row.ok .ic{color:var(--green)}
+.ord-row.warn .ic{color:var(--orange)}
+.ord-row.err .ic{color:var(--red)}
+.ord-row-detail{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.ord-note{font-size:11px;color:var(--muted);line-height:1.6}
+
 /* ── SCROLLBAR ─────────────────────────────────────────────────── */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
@@ -249,6 +267,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   .basemap-select{font-size:11px;padding:4px 6px;max-width:120px}
   .btn-add{padding:6px 10px;font-size:11px}
   #cadSearchBtn{display:none}
+  #ord904Btn{display:none}
   .tool-btn{padding:6px 8px;font-size:12px}
 
   /* Sidebar ca drawer overlay */
@@ -374,6 +393,7 @@ function logout(){
       <option value="none">☐ Fără fond</option>
     </select>
     <button class="tool-btn" id="cadSearchBtn" onclick="openCadSearch()" title="Caută număr cadastral">🔎 Căutare cadastrală</button>
+    <button class="tool-btn" id="ord904Btn" onclick="openOrd904()" title="Încarcă și validează documentație de urbanism (GeoPackage) conform Ordinului MDLPA 904/2023">📋 Documentație Urbanism</button>
     <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
     <div class="coord-display" id="coordDisplay">—</div>
     <div class="tool-sep"></div>
@@ -513,6 +533,60 @@ function logout(){
   </div>
 </div>
 
+<!-- ORDIN 904/2023 — DOCUMENTAȚIE URBANISM MODAL -->
+<div class="overlay hidden" id="ord904Modal" onclick="handleOrd904Overlay(event)">
+  <div class="modal ord-modal">
+    <div class="modal-hdr">
+      <h2>📋 Documentație Urbanism — Ordin MDLPA 904/2023</h2>
+      <button class="btn-x" onclick="closeOrd904()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="ord-note">
+        Încarcă setul de date spațiale (<code>.gpkg</code>) din folderul <code>0_Seturi_date_spatiale</code> al documentației.
+        Structura e verificată local, în acest browser, față de șablonul oficial MDLPA (11 straturi) — nu se trimite nicăieri și nu înlocuiește depunerea oficială la CJ/MDLPA.
+      </div>
+
+      <div class="drop-zone" id="ord904DropZone"
+        onclick="document.getElementById('ord904FileInput').click()"
+        ondragover="handleOrd904DragOver(event)" ondragleave="handleOrd904DragLeave(event)" ondrop="handleOrd904Drop(event)">
+        <div id="ord904DropContent">
+          <div class="drop-icon">📦</div>
+          <div class="drop-text">Trage fișierul .gpkg aici sau click</div>
+          <div class="drop-hint">GeoPackage (v1.2.0 / v1.3.1) — set de date spațiale PUG/PUZ/PUD/PATJ</div>
+        </div>
+      </div>
+      <input type="file" id="ord904FileInput" accept=".gpkg" style="display:none" onchange="handleOrd904FileSelect(event)"/>
+
+      <div class="ord-meta-row">
+        <div class="form-row">
+          <label>UAT</label>
+          <input type="text" id="ord904Uat" placeholder="detectat automat sau completează manual"/>
+        </div>
+        <div class="form-row">
+          <label>Tip documentație</label>
+          <select id="ord904Tip">
+            <option value="PUG">PUG</option>
+            <option value="PUZ">PUZ</option>
+            <option value="PUD">PUD</option>
+            <option value="PATJ">PATJ</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="ord904Progress" class="progress-bar" style="display:none"><div class="progress-fill" id="ord904ProgressFill" style="width:0%"></div></div>
+      <div id="ord904ErrMsg" class="err-msg" style="display:none"></div>
+
+      <div id="ord904Verdict"></div>
+      <div id="ord904Report" class="ord-report"></div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeOrd904()">Închide</button>
+        <button class="btn-ok" id="ord904AddBtn" onclick="addOrd904LayersToMap()" disabled>Adaugă pe hartă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- COLOR POPUP -->
 <div class="color-popup hidden" id="colorPopup">
   <div class="cp-swatches" id="cpSwatches"></div>
@@ -525,6 +599,7 @@ function logout(){
 <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://unpkg.com/sql.js@1.14.2/dist/sql-wasm.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // STATE
@@ -538,6 +613,7 @@ const CATEGORIES = [
   { id:'mediu',            icon:'🌿', label:'Mediu & Arii protejate',  color:'#27ae60' },
   { id:'proiecte',         icon:'📐', label:'Proiecte',                color:'#ff7043' },
   { id:'altele',           icon:'📋', label:'Altele',                  color:'#7f8c8d' },
+  { id:'documentatie',     icon:'🏛', label:'Documentație Urbanism (Ord. 904/2023)', color:'#00bcd4' },
   { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
   { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
   { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
@@ -838,7 +914,7 @@ function addLayer(layer) {
       if (bounds.isValid()) map.fitBounds(bounds, { padding:[40,40], maxZoom:17 });
     } catch(e){}
   }
-  renderTree();
+  if (!deferTreeRender) renderTree();
   scheduleLabels();
 }
 
@@ -1430,6 +1506,9 @@ const STEREO70_DEF =
   '+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 ' +
   '+ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs';
 proj4.defs('EPSG:31700', STEREO70_DEF);
+// EPSG:3844 (Pulkovo 1942(58) / Stereo70) — codul folosit de MDLPA în GeoPackage-urile Ord. 904/2023;
+// aceeași proiecție Stereo70, refolosim parametrii validați mai sus pentru consistență cu restul platformei
+proj4.defs('EPSG:3844', STEREO70_DEF);
 
 function sampleCoord(fc) {
   const sample = fc.features[0]?.geometry?.coordinates;
@@ -1536,6 +1615,325 @@ async function parseDxf(file) {
     }
   }
   return { type:'FeatureCollection', features };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ORDIN MDLPA 904/2023 — DOCUMENTAȚIE URBANISM (GeoPackage)
+// Structura oficială minimă (11 seturi) extrasă din șablonul MDLPA
+// (JUD_UAT_SIRUTA_PUG_AAAALLZZ.gpkg). Verificare structurală LOCALĂ —
+// nu se trimite nicăieri, nu înlocuiește depunerea oficială și nu
+// validează conținutul juridic/regulamentar.
+// ═══════════════════════════════════════════════════════════════════
+const ORD904_SRS_IDS = [3844, 31700]; // Stereo70 — ambele coduri EPSG acceptate
+const ORD904_SCHEMA = {
+  ZFExistenta:                     { geomType:'POLYGON',      fields:['Cod_ZF','Tip_ZF','Cod_SZF','Tip_SZF','HILUCS_N1','HILUCS_N2','HILUCS_N3','Arie_ZF','Data_aprob','Data_exp'] },
+  ZFPropusa:                       { geomType:'POLYGON',      fields:['Cod_ZF','Tip_ZF','Cod_SZF','Tip_SZF','HILUCS_N1','HILUCS_N2','HILUCS_N3','Arie_ZF','Data_aprob','Data_exp'] },
+  LimitaIntravilanExistenta:       { geomType:'POLYGON',      fields:['SIRUTA','Judet','UAT','Revizie','Sursa_revizie','ArieINT'] },
+  LimitaIntravilanPropusa:         { geomType:'POLYGON',      fields:['SIRUTA','Judet','UAT','Revizie','ArieINT'] },
+  PlanSpatial:                     { geomType:'MULTIPOLYGON', fields:['SIRUTA','Judet','UAT','NivelPlan','TitluPlan','HCL','Data_aprob','Data_exp','Stadiu','ArieADM','ArieINT','AriePlan'] },
+  CaiComunicatie:                  { geomType:'LINESTRING',   fields:['Cod_CCom','Tip_CCom','Subtip_CCom','Detaliu_CCom','Stadiu_CCom','Lungime'] },
+  ReteleTehnicoEdilitare:          { geomType:'LINESTRING',   fields:['Cod_RTE','Tip_RTE','Subtip_RTE','Capacitate_RTE','Detaliu_RTE','Stadiu_RTE','Lungime'] },
+  ReglementariUrbanisticePunct:    { geomType:'POINT',        fields:['ID_RU','Tip_RU','Detaliu_RU'] },
+  ZonaReglementareSuplimentara:    { geomType:'POLYGON',      fields:['Cod_ZRS','Tip_ZRS','Cod_ZRS_D','Tip_ZRS_D','Arie_ZRS','Sursa_ZRS','Detalii_sursa_ZRS','Data_aprob','Data_exp'] },
+  RegulamentLocalUrbanism:         { geomType:null,           fields:['Cod_ZF_ZRS','Tip_zona','Tip_ZF_ZRS','Desc_ZF_ZRS'] },
+  RegulamentLocalUrbanismDetaliat: { geomType:null,           fields:['Cod_SZF_ZRS_D','Tip_zona','Tip_SZF_ZRS_D','Desc_SZF_ZRS_D','Utiliz_admise','Utiliz_admise_cond','Utiliz_interzise','Parc_desc','Clad_aliniament','Clad_limite_parcele','Clad_poz','Parc_acces','Parc_stat','Clad_Hmax','Clad_RHmax','Clad_aspect_ext','Parc_edilitar','Parc_sp_verzi','Parc_imprejmuiri','POT','CUT'] },
+};
+const ORD904_LAYER_COLORS = {
+  ZFExistenta:'#3498db', ZFPropusa:'#9b59b6', LimitaIntravilanExistenta:'#e67e22',
+  LimitaIntravilanPropusa:'#f39c12', PlanSpatial:'#e74c3c', CaiComunicatie:'#795548',
+  ReteleTehnicoEdilitare:'#16a085', ReglementariUrbanisticePunct:'#c0392b',
+  ZonaReglementareSuplimentara:'#8e44ad',
+};
+
+let sqlJsPromise = null;
+function ensureSqlJs() {
+  if (!sqlJsPromise) sqlJsPromise = initSqlJs({ locateFile: f => 'https://unpkg.com/sql.js@1.14.2/dist/' + f });
+  return sqlJsPromise;
+}
+
+// Decodează geometrie WKB (ISO, folosit de GeoPackage) începând de la offset-ul dat
+function ord904DecodeWkb(bytes, startOffset) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let pos = startOffset;
+  function readGeom() {
+    const little = dv.getUint8(pos) === 1; pos += 1;
+    let type = dv.getUint32(pos, little); pos += 4;
+    let hasZ = false, hasM = false;
+    if (type >= 3000) { hasZ = true; hasM = true; type -= 3000; }
+    else if (type >= 2000) { hasM = true; type -= 2000; }
+    else if (type >= 1000) { hasZ = true; type -= 1000; }
+    function readPt() {
+      const x = dv.getFloat64(pos, little); pos += 8;
+      const y = dv.getFloat64(pos, little); pos += 8;
+      if (hasZ) pos += 8;
+      if (hasM) pos += 8;
+      return [x, y];
+    }
+    function readPts() {
+      const n = dv.getUint32(pos, little); pos += 4;
+      const arr = []; for (let i = 0; i < n; i++) arr.push(readPt());
+      return arr;
+    }
+    function readRings() {
+      const n = dv.getUint32(pos, little); pos += 4;
+      const arr = []; for (let i = 0; i < n; i++) arr.push(readPts());
+      return arr;
+    }
+    switch (type) {
+      case 1: return { type:'Point', coordinates: readPt() };
+      case 2: return { type:'LineString', coordinates: readPts() };
+      case 3: return { type:'Polygon', coordinates: readRings() };
+      case 4: { const n = dv.getUint32(pos, little); pos += 4; const c = []; for (let i=0;i<n;i++) c.push(readGeom().coordinates); return { type:'MultiPoint', coordinates:c }; }
+      case 5: { const n = dv.getUint32(pos, little); pos += 4; const c = []; for (let i=0;i<n;i++) c.push(readGeom().coordinates); return { type:'MultiLineString', coordinates:c }; }
+      case 6: { const n = dv.getUint32(pos, little); pos += 4; const c = []; for (let i=0;i<n;i++) c.push(readGeom().coordinates); return { type:'MultiPolygon', coordinates:c }; }
+      case 7: { const n = dv.getUint32(pos, little); pos += 4; const g = []; for (let i=0;i<n;i++) g.push(readGeom()); return { type:'GeometryCollection', geometries:g }; }
+      default: return null;
+    }
+  }
+  return readGeom();
+}
+
+// Decodează un BLOB de geometrie GeoPackage (header GP + envelope opțional + WKB)
+function ord904DecodeGeomBlob(blob) {
+  if (!blob || !blob.length) return null;
+  const bytes = blob instanceof Uint8Array ? blob : new Uint8Array(blob);
+  if (bytes.length < 8 || bytes[0] !== 0x47 || bytes[1] !== 0x50) return null; // 'G','P'
+  const flags = bytes[3];
+  const envIndicator = (flags >> 1) & 0x07;
+  const isEmpty = (flags >> 4) & 0x01;
+  if (isEmpty) return null;
+  const envSizes = [0, 32, 48, 48, 64];
+  const envSize = envSizes[envIndicator] || 0;
+  const wkbOffset = 8 + envSize;
+  if (wkbOffset >= bytes.length) return null;
+  try { return ord904DecodeWkb(bytes, wkbOffset); } catch(e) { return null; }
+}
+
+let ord904Db = null;
+let ord904ParsedLayers = null; // { tableName: FeatureCollection }
+let ord904SrsFound = null;
+
+function openOrd904() { document.getElementById('ord904Modal').classList.remove('hidden'); }
+function closeOrd904() {
+  document.getElementById('ord904Modal').classList.add('hidden');
+  document.getElementById('ord904FileInput').value = '';
+  document.getElementById('ord904Verdict').innerHTML = '';
+  document.getElementById('ord904Report').innerHTML = '';
+  document.getElementById('ord904ErrMsg').style.display = 'none';
+  document.getElementById('ord904Progress').style.display = 'none';
+  document.getElementById('ord904AddBtn').disabled = true;
+  document.getElementById('ord904AddBtn').textContent = 'Adaugă pe hartă';
+  document.getElementById('ord904DropZone').classList.remove('has-file');
+  document.getElementById('ord904DropContent').innerHTML =
+    '<div class="drop-icon">📦</div><div class="drop-text">Trage fișierul .gpkg aici sau click</div>' +
+    '<div class="drop-hint">GeoPackage (v1.2.0 / v1.3.1) — set de date spațiale PUG/PUZ/PUD/PATJ</div>';
+  ord904Db = null; ord904ParsedLayers = null; ord904SrsFound = null;
+}
+function handleOrd904Overlay(e) { if (e.target === e.currentTarget) closeOrd904(); }
+function handleOrd904DragOver(e)  { e.preventDefault(); document.getElementById('ord904DropZone').classList.add('drag-over'); }
+function handleOrd904DragLeave()  { document.getElementById('ord904DropZone').classList.remove('drag-over'); }
+function handleOrd904Drop(e) {
+  e.preventDefault();
+  document.getElementById('ord904DropZone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) processOrd904File(f);
+}
+function handleOrd904FileSelect(e) {
+  const f = e.target.files[0];
+  if (f) processOrd904File(f);
+}
+
+function ord904ShowErr(msg) {
+  const el = document.getElementById('ord904ErrMsg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+async function processOrd904File(file) {
+  document.getElementById('ord904ErrMsg').style.display = 'none';
+  document.getElementById('ord904Verdict').innerHTML = '';
+  document.getElementById('ord904Report').innerHTML = '';
+  document.getElementById('ord904AddBtn').disabled = true;
+  ord904ParsedLayers = null;
+
+  if (!/\.gpkg$/i.test(file.name)) { ord904ShowErr('Se acceptă doar fișiere .gpkg (GeoPackage).'); return; }
+
+  document.getElementById('ord904DropZone').classList.add('has-file');
+  document.getElementById('ord904DropContent').innerHTML =
+    `<div class="file-icon">📦</div><div class="file-info">${escapeHtml(file.name)}</div>` +
+    `<div class="file-size">${(file.size/1024/1024).toFixed(2)} MB</div>`;
+
+  // Detectare informativă tip document / UAT din numele fișierului (JUD_UAT_SIRUTA_TIP_AAAALLZZ.gpkg)
+  const nameParts = file.name.replace(/\.gpkg$/i, '').split('_');
+  const tipGuess = nameParts.find(part => ['PUG','PUZ','PUD','PATJ'].includes(part.toUpperCase()));
+  if (tipGuess) document.getElementById('ord904Tip').value = tipGuess.toUpperCase();
+  if (!document.getElementById('ord904Uat').value && nameParts[1]) document.getElementById('ord904Uat').value = nameParts[1];
+
+  const progEl = document.getElementById('ord904Progress');
+  const progFill = document.getElementById('ord904ProgressFill');
+  progEl.style.display = 'block'; progFill.style.width = '10%';
+
+  try {
+    const SQL = await ensureSqlJs();
+    progFill.style.width = '35%';
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const db = new SQL.Database(buf);
+    progFill.style.width = '55%';
+    ord904Db = db;
+    const { report, verdict, layers } = ord904Validate(db);
+    progFill.style.width = '100%';
+    ord904ParsedLayers = layers;
+    renderOrd904Report(report, verdict);
+    document.getElementById('ord904AddBtn').disabled = !layers || !Object.keys(layers).length;
+  } catch (err) {
+    ord904ShowErr('Fișierul nu a putut fi citit ca GeoPackage valid: ' + (err.message || err));
+  } finally {
+    setTimeout(() => { progEl.style.display = 'none'; }, 400);
+  }
+}
+
+function ord904Validate(db) {
+  const report = []; // { table, level:'ok'|'warn'|'err', lines:[...] }
+  const layers = {};
+  let hardErrors = 0, warnings = 0;
+
+  const contents = [];
+  const geomCols = {};
+  try {
+    const rc = db.exec('SELECT table_name, data_type FROM gpkg_contents');
+    if (rc[0]) rc[0].values.forEach(([t]) => contents.push(t));
+  } catch(e) {}
+  try {
+    const rg = db.exec('SELECT table_name, geometry_type_name, srs_id FROM gpkg_geometry_columns');
+    if (rg[0]) rg[0].values.forEach(([t, gt, srs]) => geomCols[t] = { geometryType: gt, srsId: srs });
+  } catch(e) {
+    report.push({ table:null, level:'err', lines:['Fișierul nu conține tabelele de sistem GeoPackage (gpkg_geometry_columns) — nu pare un GeoPackage valid.'] });
+    hardErrors++;
+  }
+
+  for (const [tableName, spec] of Object.entries(ORD904_SCHEMA)) {
+    const lines = [];
+    let level = 'ok';
+    const present = contents.includes(tableName);
+    if (!present) {
+      report.push({ table:tableName, level:'err', lines:['Lipsește din documentație (obligatoriu conform structurii minime MDLPA).'] });
+      hardErrors++;
+      continue;
+    }
+
+    let fieldNames = [];
+    try {
+      const ti = db.exec(`PRAGMA table_info("${tableName}")`);
+      if (ti[0]) fieldNames = ti[0].values.map(r => r[1]);
+    } catch(e) {}
+
+    if (spec.geomType) {
+      const gc = geomCols[tableName];
+      if (!gc) {
+        lines.push('Nu apare în gpkg_geometry_columns (tabel non-spațial în loc de strat geometric).');
+        level = 'err'; hardErrors++;
+      } else {
+        if (!ORD904_SRS_IDS.includes(gc.srsId)) {
+          lines.push(`Sistem de coordonate neașteptat (SRS ${gc.srsId}) — se aștepta Stereo70 (EPSG:3844 sau 31700).`);
+          level = 'err'; hardErrors++;
+        } else if (gc.srsId !== 3844) {
+          lines.push(`SRS declarat ca EPSG:${gc.srsId} (Stereo70) — șablonul MDLPA folosește EPSG:3844; sunt echivalente ca proiecție.`);
+          if (level === 'ok') { level = 'warn'; warnings++; }
+        }
+        const gt = (gc.geometryType || '').toUpperCase();
+        if (gt !== spec.geomType) {
+          lines.push(`Tip geometrie ${gt || 'necunoscut'} — se aștepta ${spec.geomType}.`);
+          if (level === 'ok') { level = 'warn'; warnings++; }
+        }
+      }
+    }
+
+    const missingFields = spec.fields.filter(f => !fieldNames.includes(f));
+    if (missingFields.length) {
+      lines.push(`Câmpuri lipsă: ${missingFields.join(', ')}.`);
+      if (level === 'ok') { level = 'warn'; warnings++; }
+    }
+
+    let count = 0;
+    try {
+      const rcount = db.exec(`SELECT COUNT(*) FROM "${tableName}"`);
+      count = rcount[0]?.values?.[0]?.[0] ?? 0;
+    } catch(e) {}
+    lines.push(`${count} înregistrăr${count===1?'e':'i'}.`);
+
+    report.push({ table: tableName, level, lines });
+
+    // Parsăm geometriile pentru straturile spațiale cu date, pentru previzualizare pe hartă
+    if (spec.geomType && count > 0 && fieldNames.includes('geom')) {
+      try {
+        const sel = db.exec(`SELECT ${fieldNames.map(c => `"${c}"`).join(',')} FROM "${tableName}"`);
+        const features = [];
+        if (sel[0]) {
+          const geomIdx = fieldNames.indexOf('geom');
+          for (const row of sel[0].values) {
+            const geom = ord904DecodeGeomBlob(row[geomIdx]);
+            if (!geom) continue;
+            const props = {};
+            fieldNames.forEach((c, i) => { if (c !== 'geom') props[c] = row[i]; });
+            features.push({ type:'Feature', geometry: geom, properties: props });
+          }
+        }
+        if (features.length) {
+          layers[tableName] = { type:'FeatureCollection', features };
+          if (geomCols[tableName]) ord904SrsFound = geomCols[tableName].srsId;
+        }
+      } catch(e) {
+        report[report.length - 1].lines.push('Eroare la citirea geometriilor: ' + (e.message || e));
+      }
+    }
+  }
+
+  const verdict = hardErrors > 0
+    ? { level:'err', text:`✗ Neconform — ${hardErrors} problem${hardErrors===1?'ă':'e'} blocant${hardErrors===1?'ă':'e'} față de structura minimă Ord. 904/2023.` }
+    : warnings > 0
+      ? { level:'warn', text:`⚠ Conform structural, cu ${warnings} observaț${warnings===1?'ie':'ii'} (vezi detalii mai jos).` }
+      : { level:'ok', text:'✓ Structură conformă cu setul minim de 11 straturi din Ord. MDLPA 904/2023.' };
+
+  return { report, verdict, layers };
+}
+
+function renderOrd904Report(report, verdict) {
+  document.getElementById('ord904Verdict').innerHTML =
+    `<div class="ord-verdict ${verdict.level}">${escapeHtml(verdict.text)}</div>`;
+  document.getElementById('ord904Report').innerHTML = report.map(r => `
+    <div class="ord-row ${r.level}">
+      <div class="ord-row-hdr"><span class="ic">${r.level==='ok'?'✓':r.level==='warn'?'⚠':'✗'}</span> ${escapeHtml(r.table || 'Fișier')}</div>
+      <div class="ord-row-detail">${r.lines.map(l => escapeHtml(l)).join('<br>')}</div>
+    </div>`).join('');
+}
+
+async function addOrd904LayersToMap() {
+  if (!ord904ParsedLayers || !Object.keys(ord904ParsedLayers).length) return;
+  const uat = document.getElementById('ord904Uat').value.trim() || 'UAT necunoscut';
+  const tip = document.getElementById('ord904Tip').value;
+  const fromEpsg = (ord904SrsFound === 31700) ? 'EPSG:31700' : 'EPSG:3844';
+
+  const addBtn = document.getElementById('ord904AddBtn');
+  addBtn.disabled = true;
+  addBtn.textContent = 'Se adaugă…';
+
+  deferTreeRender = true;
+  for (const [tableName, fc] of Object.entries(ord904ParsedLayers)) {
+    const reprojected = await reprojectAsync(fc, fromEpsg);
+    addLayer({
+      id: 'ord904_' + tableName + '_' + Date.now(),
+      name: `${tip} ${uat} — ${tableName}`,
+      cat: 'documentatie',
+      color: ORD904_LAYER_COLORS[tableName] || '#00bcd4',
+      format: 'GPKG',
+      geojson: reprojected,
+      visible: true,
+    });
+  }
+  deferTreeRender = false;
+  renderTree();
+
+  closeOrd904();
 }
 
 // ═══════════════════════════════════════════════════════════════════
