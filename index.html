@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>GIS Gorj — Portal Cartografic</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css" integrity="sha384-E6Mdw9ybwCaodCj2C6wMxX2+WJggn7nH1tS0xIBlXwSeBm1ASjHDdGDYefONGH5D" crossorigin="anonymous"/>
 <style>
 :root{
   --bg:#0e1624;--panel:#131e30;--panel2:#1a2840;--border:#1e3050;
@@ -519,12 +519,12 @@ function logout(){
   <input type="color" class="cp-custom" id="cpCustom" title="Culoare personalizată"/>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
-<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
-<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js" integrity="sha384-SvGz+Dog2fS8fxYIE3uf8dViVamrK+czJkTku+kw1+N5jqZULpRyEpT1JqF0PaWh" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js" integrity="sha384-U14wzrePlI+UpXk1Jpe45fK/C0yeI7rtwKzi9eM3Lj7LYjXlHNy0YacuWZIk7Hic" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js" integrity="sha384-HRc5vkZSgSaDK3RUgmLKiKRgoVu36MQXYR8TffzaOAYzhkKW9ITSuBY9Ozy5hnKH" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js" integrity="sha384-twf8YFpk0FSzm0AmW2GRJjjnqIuQ2y86vZXh2roYI8O+kFbEBjSUDUT6U72w8shL" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // STATE
@@ -618,6 +618,7 @@ CATEGORIES.forEach(c => CAT_STATE[c.id] = { open: c.id !== 'patj' });
 const GROUP_STATE = {};
 
 let layers = []; // { id, name, cat, color, format, geojson, visible, leafletLayer }
+let deferTreeRender = false; // batch createFgbLayer() calls without re-rendering the sidebar each time
 let selectedFile = null, selectedFiles = {};
 let activeTool = 'pan';
 let measureLayer = null;
@@ -1543,6 +1544,11 @@ async function parseDxf(file) {
 
 // Index de căutare: NATIONAL_C → {lon, lat, admin_unit}
 let cadSearchIndex = null;
+let cadSearchIndexPromise = null;
+function ensureCadSearchIndex() {
+  if (!cadSearchIndexPromise) cadSearchIndexPromise = loadCadSearchIndex();
+  return cadSearchIndexPromise;
+}
 const FGB_LAYERS = {}; // id → { fgbUrl, leafletLayer, color, name, visible }
 const FGB_MIN_ZOOM = 13; // sub acest zoom nu încărcăm features (prea multe)
 
@@ -1642,7 +1648,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
   }
   FGB_LAYERS[id] = layerObj;
   layers.push(layerObj);
-  renderTree();
+  if (!deferTreeRender) renderTree();
   return layerObj;
 }
 
@@ -1755,6 +1761,7 @@ function scheduleFgbRefresh() {
 }
 
 async function loadStaticLayers() {
+  deferTreeRender = true;
   // ── Cadastru ──
   createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb', { _withLabels: true });
   createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
@@ -1788,8 +1795,10 @@ async function loadStaticLayers() {
   createFgbLayer('static_drum_expres', 'Drum Expres',  '#42a5f5', 'DATA/Drum_expres.fgb', { cat:'proiecte', minZoom:9 });
   createFgbLayer('static_transgaz_tetila', 'Transgaz Tetila-Vâlcea', '#fdd835', 'DATA/Transgaz_Tetila_Valcea.fgb', { cat:'proiecte', minZoom:9 });
 
+  deferTreeRender = false;
+  renderTree();
+
   map.on('moveend zoomend', scheduleFgbRefresh);
-  loadCadSearchIndex();
   scheduleFgbRefresh();
 }
 
@@ -1885,6 +1894,7 @@ const ArcGISDynamic = L.Layer.extend({
 
 // ── Straturi Urbanism — locale FGB ────────
 (function() {
+  deferTreeRender = true;
   // Alunecări de Teren (primul = apare ultimul în meniu din cauza reverse())
   createFgbLayer('static_alunecari', 'Alunecări de Teren', '#e67e22',
     'DATA/AlunecariTeren.fgb', { cat:'urbanism', minZoom:9, _noIndex:true });
@@ -1954,6 +1964,7 @@ const ArcGISDynamic = L.Layer.extend({
   createFgbLayer('patj_uatb_turism',     'UATB Date Economice+Turism','#4dd0e1','DATA/PATJ/PATJ_UATB_turism.fgb',  { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
   createFgbLayer('patj_resurse_sol',     'Resurse Sol și Subsol',   '#8d6e63', 'DATA/PATJ/PATJ_UATB_resurse_sol.fgb',{ cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
 
+  deferTreeRender = false;
   renderTree();
 
   // Încarcă regimul tehnic de la CJ Gorj într-o fereastră stilizată
@@ -2151,6 +2162,7 @@ let cadSearchTimer = null;
 function openCadSearch() {
   document.getElementById('cadModal').classList.remove('hidden');
   document.getElementById('cadNr').focus();
+  ensureCadSearchIndex();
   cadLiveSearch();
 }
 function closeCadSearch() {
@@ -2186,7 +2198,7 @@ function cadLiveSearch() {
   cadSearchTimer = setTimeout(runCadSearch, 200);
 }
 
-function runCadSearch() {
+async function runCadSearch() {
   const nrRaw  = document.getElementById('cadNr').value.trim();
   const uatRaw = document.getElementById('cadUat').value.trim();
   const resultsEl = document.getElementById('cadResults');
@@ -2198,6 +2210,13 @@ function runCadSearch() {
     return;
   }
   hintEl.style.display = 'none';
+
+  if (!cadSearchIndex) {
+    resultsEl.innerHTML = '<div class="no-results">Se încarcă indexul cadastral…</div>';
+    await ensureCadSearchIndex();
+    // Query-ul poate fi depășit între timp — verificăm dacă mai e valid
+    if (document.getElementById('cadNr').value.trim() !== nrRaw || document.getElementById('cadUat').value.trim() !== uatRaw) return;
+  }
 
   const sirutaCodes = uatRaw ? findSirutaCodes(uatRaw) : null;
   if (sirutaCodes && sirutaCodes.size === 0) {
