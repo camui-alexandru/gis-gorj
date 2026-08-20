@@ -2466,28 +2466,6 @@ const ArcGISDynamic = L.Layer.extend({
 // All static layers (UAT, transport, utilities, mediu, urbanism) are now loaded
 // as FlatGeobuf via createFgbLayer() in loadStaticLayers() above.
 
-// ── Strat static Distrigaz (rețea gaze, raster georeferențiat local) ─
-(function() {
-  const bounds = [[44.5067142, 23.0863932], [45.1091016, 23.8809804]];
-  const distrigazTile = L.imageOverlay('DATA/DISTRIGAZ.png', bounds, {
-    opacity: 1, attribution: '© Distrigaz Sud Rețele'
-  });
-  const distrigazLayer = {
-    id: 'static_distrigaz',
-    name: 'Rețele Distrigaz',
-    cat: 'utilitati',
-    color: '#e67e22',
-    format: 'WMS',
-    geojson: { type:'FeatureCollection', features:[] },
-    visible: false,
-    static: true,
-    _isTile: true,
-    leafletLayer: distrigazTile,
-  };
-  layers.push(distrigazLayer);
-  renderTree();
-})();
-
 // ── Strat static DEO (Distribuție Oltenia) ──────────────────────────
 (function() {
   const deoTile = new ArcGISDynamic(
