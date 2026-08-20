@@ -120,6 +120,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .attr-tbl tr:hover{background:var(--panel2)}
 .attr-tbl td:first-child{padding:5px 10px;color:var(--muted);font-weight:600;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 .attr-tbl td:last-child{padding:5px 10px;color:var(--text);word-break:break-word}
+.attr-sides{border-top:1px solid var(--border);margin-top:4px;padding-top:2px}
+.attr-sides-title{padding:6px 10px 4px;font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px}
+.side-length-label{background:rgba(19,30,48,.92);border:1px solid var(--accent);color:var(--accent);font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px;box-shadow:none}
+.side-length-label::before{display:none}
 
 /* ── STATUS BAR ────────────────────────────────────────────────── */
 .statusbar{height:24px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0;font-size:11px;color:var(--muted);z-index:1000}
@@ -958,6 +962,41 @@ function buildLeafletLayer(layer) {
   return geojsonLayer;
 }
 
+// ── LATURI (COTE) ────────────────────────────────────────────────
+// Calculează lungimea fiecărei laturi a poligonului (inel exterior),
+// folosind aceeași metodă geodezică (distanceTo) ca unealta de măsurare.
+function polygonSideLengths(geometry) {
+  if (!geometry) return [];
+  let ring;
+  if (geometry.type === 'Polygon') ring = geometry.coordinates[0];
+  else if (geometry.type === 'MultiPolygon') ring = geometry.coordinates[0][0];
+  else return [];
+  if (!ring || ring.length < 3) return [];
+
+  const first = ring[0], last = ring[ring.length - 1];
+  const coords = (first[0] === last[0] && first[1] === last[1]) ? ring.slice(0, -1) : ring;
+
+  const sides = [];
+  for (let i = 0; i < coords.length; i++) {
+    const a = L.latLng(coords[i][1], coords[i][0]);
+    const b = L.latLng(coords[(i + 1) % coords.length][1], coords[(i + 1) % coords.length][0]);
+    sides.push({ index: i + 1, length: a.distanceTo(b), mid: L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2) });
+  }
+  return sides;
+}
+
+const sideLabelsGroup = L.layerGroup().addTo(map);
+function showSideLabels(sides) {
+  sideLabelsGroup.clearLayers();
+  sides.forEach(s => {
+    L.tooltip({ permanent: true, direction: 'center', className: 'side-length-label' })
+      .setLatLng(s.mid)
+      .setContent(s.length.toFixed(s.length < 10 ? 2 : 1) + ' m')
+      .addTo(sideLabelsGroup);
+  });
+}
+function clearSideLabels() { sideLabelsGroup.clearLayers(); }
+
 // ── LABEL ENGINE ─────────────────────────────────────────────────
 // Etichete dinamice: randăm DOAR features vizibile în viewport la zoom ≥ 15
 const labelLayerGroup = L.layerGroup().addTo(map);
@@ -1337,8 +1376,17 @@ function showAttr(feature, layer) {
 
   document.getElementById('attrHdr').style.borderLeftColor = layer.color;
 
+  const sides = polygonSideLengths(feature.geometry);
+  const sidesHtml = sides.length ? `
+      <div class="attr-sides">
+        <div class="attr-sides-title">Laturi (cote)</div>
+        <table class="attr-tbl"><tbody>
+          ${sides.map(s => `<tr><td>Latura ${s.index}</td><td>${s.length.toFixed(2)} m</td></tr>`).join('')}
+        </tbody></table>
+      </div>` : '';
+
   if (nationalC) {
-    // Mod cadastral: titlu = număr cadastral, afișăm doar suprafața
+    // Mod cadastral: titlu = număr cadastral, afișăm suprafața + laturile
     document.getElementById('attrLayerName').textContent = nationalC;
     document.getElementById('attrGeomType').textContent = layer.name;
 
@@ -1351,21 +1399,22 @@ function showAttr(feature, layer) {
     scroll.innerHTML = `
       <table class="attr-tbl"><tbody>
         <tr><td>SUPRAFAȚĂ</td><td>${areaStr}</td></tr>
-      </tbody></table>`;
+      </tbody></table>${sidesHtml}`;
   } else {
-    // Mod standard: toate atributele
+    // Mod standard: toate atributele + laturile
     document.getElementById('attrLayerName').textContent = layer.name;
     document.getElementById('attrGeomType').textContent = feature.geometry?.type || '—';
     const entries = Object.entries(props).filter(([,v]) => v !== null && v !== undefined && v !== '');
-    scroll.innerHTML = entries.length === 0
+    scroll.innerHTML = (entries.length === 0
       ? '<div class="attr-empty">Niciun atribut disponibil</div>'
       : `<table class="attr-tbl"><tbody>${entries.map(([k,v]) =>
-          `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('')}</tbody></table>`;
+          `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('')}</tbody></table>`) + sidesHtml;
   }
 
+  showSideLabels(sides);
   document.getElementById('attrPanel').classList.remove('hidden');
 }
-function closeAttr() { document.getElementById('attrPanel').classList.add('hidden'); }
+function closeAttr() { document.getElementById('attrPanel').classList.add('hidden'); clearSideLabels(); }
 
 // ═══════════════════════════════════════════════════════════════════
 // SIDEBAR TOGGLE
