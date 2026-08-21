@@ -454,23 +454,31 @@ var _identityTimer = setTimeout(function() {
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.open('login');
 }, 3000);
 
+function _showLoginBtn() {
+  var spinner = document.getElementById('lb-spinner');
+  var btn = document.getElementById('lb-btn');
+  if (spinner) spinner.style.display = 'none';
+  if (btn) btn.style.display = 'block';
+}
+
 if (typeof netlifyIdentity === 'undefined') {
   clearTimeout(_identityTimer);
-  // Identity CDN nu s-a încărcat — arată butonul de retry
   var spinner = document.getElementById('lb-spinner');
   var btn = document.getElementById('lb-btn');
   if (spinner) spinner.style.display = 'none';
   if (btn) { btn.style.display = 'block'; btn.textContent = 'Reîncarcă pagina'; btn.onclick = function(){ location.reload(); }; }
 } else {
   netlifyIdentity.on('init', function(user) {
-    clearTimeout(_identityTimer);
-    if (!user) {
-      _showBackdrop();
-      netlifyIdentity.open('login');
-    } else {
+    if (user) {
+      // Autentificat — ascunde backdropul și încarcă layerele
+      clearTimeout(_identityTimer);
       _applyIdentityUser(user);
       _hideBackdrop();
       _loadLayersOnce();
+    } else {
+      // Neautentificat — lasă timer-ul să ruleze (butonul apare după 3s)
+      // și încearcă să deschidă modalul de login
+      netlifyIdentity.open('login');
     }
   });
 
@@ -482,13 +490,17 @@ if (typeof netlifyIdentity === 'undefined') {
   });
 
   netlifyIdentity.on('logout', function() {
-    window.location.reload();
+    // Nu reîncărcăm pagina — arată direct butonul de login
+    window._userRole = null;
+    window._userIsAdmin = false;
+    _showBackdrop();
+    _showLoginBtn();
+    netlifyIdentity.open('login');
   });
 
   netlifyIdentity.on('error', function(err) {
     console.error('Identity error', err);
-    clearTimeout(_identityTimer);
-    // Nu deblochăm — eroare de autentificare = fără acces
+    // Nu ștergem timer-ul — butonul fallback va apărea după 3s
   });
 }
 </script>
