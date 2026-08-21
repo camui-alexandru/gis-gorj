@@ -8,11 +8,11 @@
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <style>
 #_login-backdrop{
-  display:none;position:fixed;inset:0;z-index:9999;
+  display:flex;position:fixed;inset:0;z-index:5000;
   background:linear-gradient(135deg,#060e1a 0%,#0d1b2e 60%,#0a1520 100%);
   align-items:center;justify-content:center;flex-direction:column;gap:16px;
 }
-#_login-backdrop.show{display:flex}
+#_login-backdrop.hidden{display:none!important}
 #_login-backdrop .lb-logo{width:72px;height:72px;opacity:.9}
 #_login-backdrop .lb-title{font-family:'Segoe UI',Arial,sans-serif;font-size:20px;font-weight:800;color:#d8e4f0;letter-spacing:.3px}
 #_login-backdrop .lb-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#5a7090;letter-spacing:.5px}
@@ -403,7 +403,12 @@ function _canSee(minRole) { return _roleLevel() >= (_ROLE_LEVEL[minRole] || 1); 
 function _loadLayersOnce() {
   if (_layersLoaded) return;
   _layersLoaded = true;
-  loadStaticLayers();
+  try {
+    var p = loadStaticLayers();
+    if (p && typeof p.catch === 'function') p.catch(function(e){ console.error('loadStaticLayers:', e); });
+  } catch(e) {
+    console.error('loadStaticLayers:', e);
+  }
 }
 
 const _ROLE_LABELS = { admin: 'Admin', user: 'User' };
@@ -429,19 +434,16 @@ function _applyIdentityUser(user) {
 
 function _showBackdrop() {
   var b = document.getElementById('_login-backdrop');
-  if (b) b.classList.add('show');
+  if (b) b.classList.remove('hidden');
 }
 function _hideBackdrop() {
   var b = document.getElementById('_login-backdrop');
-  if (b) b.classList.remove('show');
+  if (b) b.classList.add('hidden');
 }
 
 function logout() {
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
 }
-
-// Arată backdropul imediat la pornire
-_showBackdrop();
 
 // Fallback: dacă Identity nu răspunde în 3s → arată butonul de login manual
 var _identityTimer = setTimeout(function() {
