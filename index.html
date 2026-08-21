@@ -380,7 +380,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   <div class="lb-title">GIS Gorj</div>
   <div class="lb-sub">Portal Cartografic Județean</div>
   <div class="lb-spinner" id="lb-spinner"></div>
-  <button class="lb-btn" id="lb-btn" onclick="if(typeof netlifyIdentity!=='undefined')netlifyIdentity.open('login')">Autentificare</button>
+  <button class="lb-btn" id="lb-btn" onclick="_openLoginModal()">Autentificare</button>
 </div>
 
 <script>
@@ -406,14 +406,16 @@ function _loadLayersOnce() {
 
 function _applyIdentityUser(user) {
   if (!user) return;
-  window._userRole = 'user';
+  const netlifyRoles = (user.app_metadata && user.app_metadata.roles) || [];
+  const isAdmin = netlifyRoles.includes('admin');
+  window._userRole = isAdmin ? 'admin' : 'user';
   const name = (user.user_metadata && user.user_metadata.full_name) || user.email || 'Utilizator';
   const el = document.getElementById('userDisplay');
   if (el) el.textContent = name;
   const badge = document.getElementById('userRoleBadge');
   if (badge) {
-    badge.textContent = 'User';
-    badge.style.background = '#2980b9';
+    badge.textContent = isAdmin ? 'Admin' : 'User';
+    badge.style.background = isAdmin ? '#c0392b' : '#2980b9';
   }
 }
 
@@ -432,14 +434,6 @@ function logout() {
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
 }
 
-// Fallback: dacă Identity nu deschide modalul în 3s → arată butonul de login
-var _identityTimer = setTimeout(function() {
-  var spinner = document.getElementById('lb-spinner');
-  var btn = document.getElementById('lb-btn');
-  if (spinner) spinner.style.display = 'none';
-  if (btn) btn.style.display = 'block';
-}, 3000);
-
 function _showLoginBtn() {
   var spinner = document.getElementById('lb-spinner');
   var btn = document.getElementById('lb-btn');
@@ -447,23 +441,34 @@ function _showLoginBtn() {
   if (btn) btn.style.display = 'block';
 }
 
+// Ascunde backdropul complet înainte de a deschide modalul — elimină orice conflict de z-index
+function _openLoginModal() {
+  _hideBackdrop();
+  if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.open('login');
+}
+
+// Fallback: dacă Identity nu inițializează în 4s → arată butonul
+var _identityTimer = setTimeout(function() {
+  _showLoginBtn();
+}, 4000);
+
 if (typeof netlifyIdentity === 'undefined') {
   clearTimeout(_identityTimer);
   var spinner = document.getElementById('lb-spinner');
   var btn = document.getElementById('lb-btn');
   if (spinner) spinner.style.display = 'none';
-  if (btn) { btn.style.display = 'block'; btn.textContent = 'Reîncarcă pagina'; btn.onclick = function(){ location.reload(); }; }
+  if (btn) { btn.style.display = 'block'; btn.textContent = 'Reincarcare pagina'; btn.onclick = function(){ location.reload(); }; }
 } else {
   netlifyIdentity.on('init', function(user) {
     if (user) {
-      // Autentificat — ascunde backdropul și încarcă layerele
       clearTimeout(_identityTimer);
       _applyIdentityUser(user);
       _hideBackdrop();
       _loadLayersOnce();
     } else {
-      // Neautentificat — deschide modalul de login; timer-ul arată butonul dacă modalul nu apare
-      netlifyIdentity.open('login');
+      // Ascunde backdropul și deschide automat modalul
+      clearTimeout(_identityTimer);
+      _openLoginModal();
     }
   });
 
@@ -474,10 +479,16 @@ if (typeof netlifyIdentity === 'undefined') {
     _loadLayersOnce();
   });
 
+  // Dacă userul închide modalul fără login → arată backdropul cu butonul
+  netlifyIdentity.on('close', function() {
+    if (!window._userRole) {
+      _showBackdrop();
+      _showLoginBtn();
+    }
+  });
+
   netlifyIdentity.on('logout', function() {
-    // Nu reîncărcăm pagina — arată direct butonul de login
     window._userRole = null;
-    window._userIsAdmin = false;
     _showBackdrop();
     _showLoginBtn();
     netlifyIdentity.open('login');
@@ -485,7 +496,8 @@ if (typeof netlifyIdentity === 'undefined') {
 
   netlifyIdentity.on('error', function(err) {
     console.error('Identity error', err);
-    // Nu ștergem timer-ul — butonul fallback va apărea după 3s
+    _showBackdrop();
+    _showLoginBtn();
   });
 }
 </script>
@@ -734,12 +746,6 @@ if (typeof netlifyIdentity === 'undefined') {
 const CATEGORIES = [
   { id:'cadastru',         icon:'📍', label:'Cadastru',               color:'#e8a838' },
   { id:'urbanism',         icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
-  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
-  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
-  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
-  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
-  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
   { id:'drumuri',          icon:'🛣', label:'Transport',               color:'#e74c3c' },
   { id:'utilitati',        icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport',        icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
@@ -747,6 +753,12 @@ const CATEGORIES = [
   { id:'proiecte',         icon:'📐', label:'Proiecte',                color:'#ff7043' },
   { id:'altele',           icon:'📋', label:'Altele',                  color:'#7f8c8d' },
   { id:'documentatie',     icon:'🏛', label:'Documentație Urbanism (Ord. 904/2023)', color:'#00bcd4' },
+  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
+  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
+  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
+  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
+  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
+  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
 ];
 
 
