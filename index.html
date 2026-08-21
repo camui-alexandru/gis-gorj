@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>GIS Gorj — Portal Cartografic</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css"/>
 <style>
@@ -351,20 +352,56 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 </head>
 <body>
 <script>
-(function(){
-  var AUTH_KEY='gis_gorj_auth';
-  var AUTH_USER_KEY='gis_gorj_user';
-  var stored=sessionStorage.getItem(AUTH_KEY)||localStorage.getItem(AUTH_KEY);
-  if(stored!=='ok'){location.replace('login.html');return;}
-  var raw=sessionStorage.getItem(AUTH_USER_KEY)||localStorage.getItem(AUTH_USER_KEY);
-  if(raw){try{var u=JSON.parse(raw);document.addEventListener('DOMContentLoaded',function(){var el=document.getElementById('userDisplay');if(el)el.textContent=u.name||u.username;});}catch(e){}}
-})();
-function logout(){
-  var K='gis_gorj_auth',UK='gis_gorj_user';
-  sessionStorage.removeItem(K);sessionStorage.removeItem(UK);
-  localStorage.removeItem(K);localStorage.removeItem(UK);
-  location.replace('login.html');
+/* ── NETLIFY IDENTITY AUTH ─────────────────────────────────────────────
+   Email-uri cu rol Admin (acces complet + PATJ Gorj).
+   Orice alt utilizator autentificat → acces fără PATJ.
+─────────────────────────────────────────────────────────────────────── */
+const _ADMIN_EMAILS = [
+  'camui.alexandru@gmail.com',
+];
+window._userIsAdmin = false;
+
+function _applyIdentityUser(user) {
+  if (!user) { netlifyIdentity.open(); return; }
+  const roles = (user.app_metadata && user.app_metadata.roles) || [];
+  const byEmail = _ADMIN_EMAILS.includes((user.email || '').toLowerCase());
+  window._userIsAdmin = byEmail || roles.includes('admin');
+  const displayName = (user.user_metadata && user.user_metadata.full_name) || user.email || '—';
+  const el = document.getElementById('userDisplay');
+  if (el) el.textContent = displayName;
+  const badge = document.getElementById('userRoleBadge');
+  if (badge) {
+    badge.textContent = window._userIsAdmin ? 'Admin' : 'User';
+    badge.style.background = window._userIsAdmin ? '#c0392b' : '#2980b9';
+  }
 }
+
+function logout() {
+  netlifyIdentity.logout();
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  netlifyIdentity.on('init', function(user) {
+    if (!user) {
+      netlifyIdentity.open('login');
+    } else {
+      _applyIdentityUser(user);
+      loadStaticLayers();
+    }
+  });
+  netlifyIdentity.on('login', function(user) {
+    netlifyIdentity.close();
+    _applyIdentityUser(user);
+    loadStaticLayers();
+  });
+  netlifyIdentity.on('logout', function() {
+    window._userIsAdmin = false;
+    netlifyIdentity.open('login');
+  });
+  netlifyIdentity.on('error', function(err) {
+    console.error('Identity error', err);
+  });
+});
 </script>
 
 <!-- ── TOPBAR ─────────────────────────────────────────────────── -->
@@ -401,7 +438,7 @@ function logout(){
     <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
     <div class="coord-display" id="coordDisplay">—</div>
     <div class="tool-sep"></div>
-    <div class="user-badge">👤 <span id="userDisplay">—</span></div>
+    <div class="user-badge">👤 <span id="userDisplay">—</span> <span id="userRoleBadge" style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;color:#fff;margin-left:4px;background:#2980b9"></span></div>
     <button class="btn-logout" onclick="logout()" title="Deconectare">⏻ Ieșire</button>
   </div>
 </div>
@@ -611,6 +648,12 @@ function logout(){
 const CATEGORIES = [
   { id:'cadastru',         icon:'📍', label:'Cadastru',               color:'#e8a838' },
   { id:'urbanism',         icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
+  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b', _adminOnly:true },
+  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj', _adminOnly:true },
+  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj', _adminOnly:true },
+  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj', _adminOnly:true },
+  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj', _adminOnly:true },
+  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj', _adminOnly:true },
   { id:'drumuri',          icon:'🛣', label:'Transport',               color:'#e74c3c' },
   { id:'utilitati',        icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport',        icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
@@ -1178,7 +1221,8 @@ function renderTree() {
   }
 
   function renderCatBlock(cat, depth) {
-    const children = CATEGORIES.filter(c => c.parent === cat.id);
+    if (cat._adminOnly && !window._userIsAdmin) return '';
+    const children = CATEGORIES.filter(c => c.parent === cat.id && (!c._adminOnly || window._userIsAdmin));
     const catLayers = layers.filter(l => l.cat === cat.id && (!q || l.name.toLowerCase().includes(q)));
     const allDesc = allDescLayers(cat);
     const allDescFiltered = q ? allDesc.filter(l => l.name.toLowerCase().includes(q)) : allDesc;
@@ -1205,7 +1249,7 @@ function renderTree() {
     </div>`;
   }
 
-  tree.innerHTML = CATEGORIES.filter(c => !c.parent).map(cat => renderCatBlock(cat, 0)).join('');
+  tree.innerHTML = CATEGORIES.filter(c => !c.parent && (!c._adminOnly || window._userIsAdmin)).map(cat => renderCatBlock(cat, 0)).join('');
 
   document.getElementById('totalCount').textContent = `${layers.length} strat${layers.length !== 1 ? 'uri' : ''}`;
   document.getElementById('featureCountBar').querySelector('span').textContent =
@@ -2405,10 +2449,9 @@ async function loadStaticLayers() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// INIT
+// INIT — renderTree imediat (arbore gol), loadStaticLayers după auth
 // ═══════════════════════════════════════════════════════════════════
 renderTree();
-loadStaticLayers();
 
 // ── Layer custom pentru ArcGIS Dynamic MapServer ─────────────────────
 const ArcGISDynamic = L.Layer.extend({
@@ -2513,7 +2556,9 @@ const ArcGISDynamic = L.Layer.extend({
   createFgbLayer('static_intravilan', 'Limite Intravilan', '#9b59b6',
     'DATA/LIMITA_INTRAVILAN.fgb', { cat:'urbanism', minZoom:9 });
 
-  // ── PATJ Gorj — Mediu & Riscuri ─────────────────────────────────
+  // ── PATJ Gorj — acces restricționat (doar Admin) ────────────────
+  if (window._userIsAdmin) {
+  // ── Mediu & Riscuri ──────────────────────────────────────────────
   createFgbLayer('patj_risc_inundatii',  'Risc Inundații',          '#c0392b', 'DATA/PATJ/PATJ_risc_inundatii.fgb',  { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.7 });
   createFgbLayer('patj_seismic',         'Intensitate Seismică',    '#e74c3c', 'DATA/PATJ/PATJ_seismic.fgb',          { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.65 });
   createFgbLayer('patj_anp',             'Arii Naturale Protejate', '#27ae60', 'DATA/PATJ/PATJ_ANP.fgb',              { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.6 });
@@ -2565,6 +2610,7 @@ const ArcGISDynamic = L.Layer.extend({
   createFgbLayer('patj_statiuni',        'Stațiuni Turistice',      '#26c6da', 'DATA/PATJ/PATJ_statiuni.fgb',        { cat:'patj_economic', minZoom:9, _noIndex:true });
   createFgbLayer('patj_uatb_turism',     'UATB Date Economice+Turism','#4dd0e1','DATA/PATJ/PATJ_UATB_turism.fgb',  { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
   createFgbLayer('patj_resurse_sol',     'Resurse Sol și Subsol',   '#8d6e63', 'DATA/PATJ/PATJ_UATB_resurse_sol.fgb',{ cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
+  } // end PATJ admin-only block
 
   deferTreeRender = false;
   renderTree();
