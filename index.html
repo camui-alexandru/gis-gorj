@@ -8,11 +8,15 @@
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <style>
 #_login-backdrop{
-  display:flex;position:fixed;inset:0;z-index:5000;
+  display:flex;position:fixed;inset:0;z-index:1001;
   background:linear-gradient(135deg,#060e1a 0%,#0d1b2e 60%,#0a1520 100%);
   align-items:center;justify-content:center;flex-direction:column;gap:16px;
 }
 #_login-backdrop.hidden{display:none!important}
+/* Când auth e în așteptare, coborâm topbar/sidebar/statusbar sub backdrop */
+body.auth-pending .topbar,
+body.auth-pending .statusbar,
+body.auth-pending .sidebar{z-index:50!important}
 #_login-backdrop .lb-logo{width:72px;height:72px;opacity:.9}
 #_login-backdrop .lb-title{font-family:'Segoe UI',Arial,sans-serif;font-size:20px;font-weight:800;color:#d8e4f0;letter-spacing:.3px}
 #_login-backdrop .lb-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#5a7090;letter-spacing:.5px}
@@ -365,7 +369,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 
 </style>
 </head>
-<body>
+<body class="auth-pending">
 
 <!-- ── BACKDROP LOGIN (apare sub modalul Netlify Identity) ─────────── -->
 <div id="_login-backdrop">
@@ -435,10 +439,12 @@ function _applyIdentityUser(user) {
 function _showBackdrop() {
   var b = document.getElementById('_login-backdrop');
   if (b) b.classList.remove('hidden');
+  document.body.classList.add('auth-pending');
 }
 function _hideBackdrop() {
   var b = document.getElementById('_login-backdrop');
   if (b) b.classList.add('hidden');
+  document.body.classList.remove('auth-pending');
 }
 
 function logout() {
