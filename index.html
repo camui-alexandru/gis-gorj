@@ -7,13 +7,14 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <style>
+/* Netlify Identity widget — forțat deasupra tuturor elementelor */
+#netlify-identity-widget{z-index:99999!important}
 #_login-backdrop{
-  display:flex;position:fixed;inset:0;z-index:1001;
+  display:flex;position:fixed;inset:0;z-index:9000;
   background:linear-gradient(135deg,#060e1a 0%,#0d1b2e 60%,#0a1520 100%);
   align-items:center;justify-content:center;flex-direction:column;gap:16px;
 }
 #_login-backdrop.hidden{display:none!important}
-/* Când auth e în așteptare, coborâm topbar/sidebar/statusbar sub backdrop */
 body.auth-pending .topbar,
 body.auth-pending .statusbar,
 body.auth-pending .sidebar{z-index:50!important}
@@ -383,26 +384,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 </div>
 
 <script>
-/* ── SISTEM ROLURI GIS GORJ ────────────────────────────────────────────
-   Roluri:  admin → acces complet (toate layerele, inclusiv PATJ Gorj)
-            user  → acces la toate layerele exceptând PATJ Gorj
+/* ── AUTH GIS GORJ ─────────────────────────────────────────────────────
    Accesul fără login este BLOCAT complet.
-
-   Adaugă utilizatori în _USER_ROLES (email → rol).
-   Orice utilizator autentificat care nu apare în listă → 'user'.
+   Orice utilizator autentificat prin Netlify Identity vede toate layerele.
 ─────────────────────────────────────────────────────────────────────── */
-const _USER_ROLES = {
-  'camui.alexandru@gmail.com': 'admin',
-  // 'coleg@primarie.ro': 'user',
-};
-
-const _ROLE_LEVEL = { user: 1, admin: 2 };
 window._userRole = null;
-window._userIsAdmin = false;
 let _layersLoaded = false;
 
-function _roleLevel() { return _ROLE_LEVEL[window._userRole] || 0; }
-function _canSee(minRole) { return _roleLevel() >= (_ROLE_LEVEL[minRole] || 1); }
+function _canSee() { return !!window._userRole; }
 
 function _loadLayersOnce() {
   if (_layersLoaded) return;
@@ -415,24 +404,16 @@ function _loadLayersOnce() {
   }
 }
 
-const _ROLE_LABELS = { admin: 'Admin', user: 'User' };
-const _ROLE_COLORS = { admin: '#c0392b', user: '#2980b9' };
-
 function _applyIdentityUser(user) {
   if (!user) return;
-  const email = (user.email || '').toLowerCase();
-  const netlifyRoles = (user.app_metadata && user.app_metadata.roles) || [];
-  window._userRole = _USER_ROLES[email]
-    || (netlifyRoles.includes('admin') ? 'admin' : null)
-    || 'user';
-  window._userIsAdmin = (window._userRole === 'admin');
+  window._userRole = 'user';
   const name = (user.user_metadata && user.user_metadata.full_name) || user.email || 'Utilizator';
   const el = document.getElementById('userDisplay');
   if (el) el.textContent = name;
   const badge = document.getElementById('userRoleBadge');
   if (badge) {
-    badge.textContent = _ROLE_LABELS[window._userRole] || window._userRole;
-    badge.style.background = _ROLE_COLORS[window._userRole] || '#555';
+    badge.textContent = 'User';
+    badge.style.background = '#2980b9';
   }
 }
 
@@ -451,13 +432,12 @@ function logout() {
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
 }
 
-// Fallback: dacă Identity nu răspunde în 3s → arată butonul de login manual
+// Fallback: dacă Identity nu deschide modalul în 3s → arată butonul de login
 var _identityTimer = setTimeout(function() {
   var spinner = document.getElementById('lb-spinner');
   var btn = document.getElementById('lb-btn');
   if (spinner) spinner.style.display = 'none';
   if (btn) btn.style.display = 'block';
-  if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.open('login');
 }, 3000);
 
 function _showLoginBtn() {
@@ -482,8 +462,7 @@ if (typeof netlifyIdentity === 'undefined') {
       _hideBackdrop();
       _loadLayersOnce();
     } else {
-      // Neautentificat — lasă timer-ul să ruleze (butonul apare după 3s)
-      // și încearcă să deschidă modalul de login
+      // Neautentificat — deschide modalul de login; timer-ul arată butonul dacă modalul nu apare
       netlifyIdentity.open('login');
     }
   });
@@ -755,12 +734,12 @@ if (typeof netlifyIdentity === 'undefined') {
 const CATEGORIES = [
   { id:'cadastru',         icon:'📍', label:'Cadastru',               color:'#e8a838' },
   { id:'urbanism',         icon:'🏘', label:'Urbanism (PUG/PUZ/PUD)', color:'#9b59b6' },
-  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b', _minRole:'admin' },
-  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj', _minRole:'admin' },
-  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj', _minRole:'admin' },
-  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj', _minRole:'admin' },
-  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj', _minRole:'admin' },
-  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj', _minRole:'admin' },
+  { id:'patj',             icon:'🗺', label:'PATJ Gorj',              color:'#c0392b' },
+  { id:'patj_mediu',       icon:'🛡', label:'Mediu & Riscuri',        color:'#c0392b', parent:'patj' },
+  { id:'patj_retea',       icon:'🏙', label:'Rețea Localități',       color:'#8e44ad', parent:'patj' },
+  { id:'patj_comunicatii', icon:'🛤', label:'Căi Comunicații',        color:'#d35400', parent:'patj' },
+  { id:'patj_tehnic',      icon:'⚙', label:'Infrastructuri Tehnice', color:'#16a085', parent:'patj' },
+  { id:'patj_economic',    icon:'📊', label:'Economic & Turism',      color:'#2980b9', parent:'patj' },
   { id:'drumuri',          icon:'🛣', label:'Transport',               color:'#e74c3c' },
   { id:'utilitati',        icon:'⚡', label:'Rețele Utilități',        color:'#2ecc71' },
   { id:'transport',        icon:'🔵', label:'Rețele Transport',        color:'#3498db' },
@@ -2542,8 +2521,7 @@ async function loadStaticLayers() {
   createFgbLayer('static_drum_expres', 'Drum Expres',  '#42a5f5', 'DATA/Drum_expres.fgb', { cat:'proiecte', minZoom:9 });
   createFgbLayer('static_transgaz_tetila', 'Transgaz Tetila-Vâlcea', '#fdd835', 'DATA/Transgaz_Tetila_Valcea.fgb', { cat:'proiecte', minZoom:9 });
 
-  // ── PATJ Gorj — acces restricționat (minim: admin) ─────────────
-  if (_canSee('admin')) {
+  // ── PATJ Gorj ─────────────────────────────────────────────────
   createFgbLayer('patj_risc_inundatii',  'Risc Inundații',             '#c0392b', 'DATA/PATJ/PATJ_risc_inundatii.fgb',       { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.7 });
   createFgbLayer('patj_seismic',         'Intensitate Seismică',       '#e74c3c', 'DATA/PATJ/PATJ_seismic.fgb',               { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.65 });
   createFgbLayer('patj_anp',             'Arii Naturale Protejate',    '#27ae60', 'DATA/PATJ/PATJ_ANP.fgb',                   { cat:'patj_mediu', minZoom:8, _noIndex:true, _opacity:0.6 });
@@ -2587,7 +2565,6 @@ async function loadStaticLayers() {
   createFgbLayer('patj_statiuni',        'Stațiuni Turistice',         '#26c6da', 'DATA/PATJ/PATJ_statiuni.fgb',              { cat:'patj_economic', minZoom:9, _noIndex:true });
   createFgbLayer('patj_uatb_turism',     'UATB Date Economice+Turism', '#4dd0e1', 'DATA/PATJ/PATJ_UATB_turism.fgb',          { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
   createFgbLayer('patj_resurse_sol',     'Resurse Sol și Subsol',      '#8d6e63', 'DATA/PATJ/PATJ_UATB_resurse_sol.fgb',     { cat:'patj_economic', minZoom:8, _noIndex:true, _opacity:0.6 });
-  } // end PATJ admin-only
 
   deferTreeRender = false;
   renderTree();
