@@ -287,13 +287,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   .tb-brand h1 small{display:none}
   .tb-brand h1{font-size:13px}
   .tb-tools{display:none}
-  .tb-right{padding:0 8px;gap:6px}
+  .tb-right{padding:0 8px;gap:6px;flex-wrap:nowrap;overflow:hidden}
   .coord-display{display:none}
-  .basemap-select{font-size:11px;padding:4px 6px;max-width:120px}
-  .btn-add{padding:6px 10px;font-size:11px}
+  .basemap-select{display:none}
+  .btn-add{display:none}
   #cadSearchBtn{display:none}
   #ord904Btn{display:none}
   .tool-btn{padding:6px 8px;font-size:12px}
+  .user-badge{font-size:11px;padding:3px 8px;max-width:180px;overflow:hidden}
+  .user-badge span#userDisplay{overflow:hidden;text-overflow:ellipsis;max-width:100px}
+  .btn-logout{padding:5px 8px;font-size:11px}
+  #mob-basemap-row{display:flex!important}
 
   /* Sidebar ca drawer overlay */
   .sidebar{
@@ -330,6 +334,26 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   #mob-search-btn{
     display:flex;align-items:center;justify-content:center;
     position:fixed;bottom:140px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--panel);color:var(--text);
+    border:1px solid var(--border);font-size:20px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
+  /* Buton float adaugă strat */
+  #mob-upload-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:200px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    border:none;font-size:22px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
+  /* Buton float documentație urbanism */
+  #mob-ord904-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:260px;left:12px;
     width:48px;height:48px;border-radius:50%;
     background:var(--panel);color:var(--text);
     border:1px solid var(--border);font-size:20px;cursor:pointer;
@@ -559,6 +583,20 @@ if (typeof netlifyIdentity === 'undefined') {
       <button class="sf-btn" onclick="setAllVisible(false)">🚫 Ascunde tot</button>
       <button class="sf-btn" onclick="zoomToAll()">⛶ Extindere</button>
     </div>
+    <!-- Basemap selector vizibil doar pe mobil -->
+    <div id="mob-basemap-row" style="display:none;padding:8px 12px;border-top:1px solid var(--border);gap:8px;align-items:center">
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap">Hartă de bază:</span>
+      <select class="basemap-select" style="display:block;flex:1;font-size:12px" onchange="switchBasemap(this.value)">
+        <option value="gmaps">🗺 Google Maps</option>
+        <option value="gsat">🛰 Google Satelit</option>
+        <option value="ghybrid">🛰 Google Hibrid</option>
+        <option value="osm">🗺 OSM Standard</option>
+        <option value="topo">🏔 OSM Topo</option>
+        <option value="satellite">🛰 Satelit ESRI</option>
+        <option value="dark">🌑 Dark</option>
+        <option value="none">☐ Fără fond</option>
+      </select>
+    </div>
   </div>
 
   <!-- MAP -->
@@ -568,6 +606,8 @@ if (typeof netlifyIdentity === 'undefined') {
   <div id="mob-backdrop" onclick="closeMobileSidebar()"></div>
   <button id="mob-layers-btn" onclick="toggleMobileSidebar()" style="display:none">☰</button>
   <button id="mob-search-btn" onclick="openCadSearch()" style="display:none">🔎</button>
+  <button id="mob-upload-btn" onclick="openUpload()" style="display:none" title="Adaugă strat">＋</button>
+  <button id="mob-ord904-btn" onclick="openOrd904()" style="display:none" title="Documentație Urbanism">📋</button>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
@@ -1577,6 +1617,8 @@ function closeMobileSidebar() {
     const isMob = window.innerWidth <= 767;
     document.getElementById('mob-layers-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-search-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-upload-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-ord904-btn').style.display = isMob ? 'flex' : 'none';
     if (!isMob) closeMobileSidebar();
   }
   checkMobile();
