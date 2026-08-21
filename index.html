@@ -406,14 +406,16 @@ function _loadLayersOnce() {
 
 function _applyIdentityUser(user) {
   if (!user) return;
-  window._userRole = 'user';
+  const netlifyRoles = (user.app_metadata && user.app_metadata.roles) || [];
+  const isAdmin = netlifyRoles.includes('admin');
+  window._userRole = isAdmin ? 'admin' : 'user';
   const name = (user.user_metadata && user.user_metadata.full_name) || user.email || 'Utilizator';
   const el = document.getElementById('userDisplay');
   if (el) el.textContent = name;
   const badge = document.getElementById('userRoleBadge');
   if (badge) {
-    badge.textContent = 'User';
-    badge.style.background = '#2980b9';
+    badge.textContent = isAdmin ? 'Admin' : 'User';
+    badge.style.background = isAdmin ? '#c0392b' : '#2980b9';
   }
 }
 
