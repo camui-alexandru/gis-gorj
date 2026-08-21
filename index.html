@@ -287,13 +287,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   .tb-brand h1 small{display:none}
   .tb-brand h1{font-size:13px}
   .tb-tools{display:none}
-  .tb-right{padding:0 8px;gap:6px}
+  .tb-right{padding:0 8px;gap:6px;flex-wrap:nowrap;overflow:hidden}
   .coord-display{display:none}
-  .basemap-select{font-size:11px;padding:4px 6px;max-width:120px}
-  .btn-add{padding:6px 10px;font-size:11px}
+  .basemap-select{display:none}
+  .btn-add{display:none}
   #cadSearchBtn{display:none}
   #ord904Btn{display:none}
   .tool-btn{padding:6px 8px;font-size:12px}
+  .user-badge{font-size:11px;padding:3px 8px;max-width:180px;overflow:hidden}
+  .user-badge span#userDisplay{overflow:hidden;text-overflow:ellipsis;max-width:100px}
+  .btn-logout{padding:5px 8px;font-size:11px}
+  #mob-basemap-row{display:flex!important}
 
   /* Sidebar ca drawer overlay */
   .sidebar{
@@ -558,6 +562,20 @@ if (typeof netlifyIdentity === 'undefined') {
       <button class="sf-btn" onclick="setAllVisible(true)">👁 Arată tot</button>
       <button class="sf-btn" onclick="setAllVisible(false)">🚫 Ascunde tot</button>
       <button class="sf-btn" onclick="zoomToAll()">⛶ Extindere</button>
+    </div>
+    <!-- Basemap selector vizibil doar pe mobil -->
+    <div id="mob-basemap-row" style="display:none;padding:8px 12px;border-top:1px solid var(--border);gap:8px;align-items:center">
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap">Hartă de bază:</span>
+      <select class="basemap-select" style="display:block;flex:1;font-size:12px" onchange="switchBasemap(this.value)">
+        <option value="gmaps">🗺 Google Maps</option>
+        <option value="gsat">🛰 Google Satelit</option>
+        <option value="ghybrid">🛰 Google Hibrid</option>
+        <option value="osm">🗺 OSM Standard</option>
+        <option value="topo">🏔 OSM Topo</option>
+        <option value="satellite">🛰 Satelit ESRI</option>
+        <option value="dark">🌑 Dark</option>
+        <option value="none">☐ Fără fond</option>
+      </select>
     </div>
   </div>
 
