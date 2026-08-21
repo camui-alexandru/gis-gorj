@@ -353,22 +353,27 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 <body>
 <script>
 /* ── NETLIFY IDENTITY AUTH ─────────────────────────────────────────────
-   Email-uri cu rol Admin (acces complet + PATJ Gorj).
-   Orice alt utilizator autentificat → acces fără PATJ.
+   Admin: emailurile din _ADMIN_EMAILS sau rol 'admin' setat în Netlify.
+   User obișnuit: acces fără PATJ Gorj.
+   Fallback: dacă Identity nu se inițializează în 5s, încarcă fără PATJ.
 ─────────────────────────────────────────────────────────────────────── */
-const _ADMIN_EMAILS = [
-  'camui.alexandru@gmail.com',
-];
+const _ADMIN_EMAILS = ['camui.alexandru@gmail.com'];
 window._userIsAdmin = false;
+let _layersLoaded = false;
+
+function _loadLayersOnce() {
+  if (_layersLoaded) return;
+  _layersLoaded = true;
+  loadStaticLayers();
+}
 
 function _applyIdentityUser(user) {
-  if (!user) { netlifyIdentity.open(); return; }
+  if (!user) return;
   const roles = (user.app_metadata && user.app_metadata.roles) || [];
-  const byEmail = _ADMIN_EMAILS.includes((user.email || '').toLowerCase());
-  window._userIsAdmin = byEmail || roles.includes('admin');
-  const displayName = (user.user_metadata && user.user_metadata.full_name) || user.email || '—';
+  window._userIsAdmin = _ADMIN_EMAILS.includes((user.email||'').toLowerCase()) || roles.includes('admin');
+  const name = (user.user_metadata && user.user_metadata.full_name) || user.email || 'Utilizator';
   const el = document.getElementById('userDisplay');
-  if (el) el.textContent = displayName;
+  if (el) el.textContent = name;
   const badge = document.getElementById('userRoleBadge');
   if (badge) {
     badge.textContent = window._userIsAdmin ? 'Admin' : 'User';
@@ -377,29 +382,57 @@ function _applyIdentityUser(user) {
 }
 
 function logout() {
-  netlifyIdentity.logout();
+  if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+  // Fallback: dacă Identity nu răspunde în 5s, încarcă layerele (fără PATJ)
+  var identityTimer = setTimeout(function() {
+    console.warn('Netlify Identity nu s-a inițializat — fallback fără auth');
+    var el = document.getElementById('userDisplay');
+    if (el && el.textContent === '—') el.textContent = 'Vizitator';
+    _loadLayersOnce();
+  }, 5000);
+
+  if (typeof netlifyIdentity === 'undefined') {
+    // Scriptul CDN nu s-a încărcat
+    clearTimeout(identityTimer);
+    var el = document.getElementById('userDisplay');
+    if (el) el.textContent = 'Vizitator';
+    _loadLayersOnce();
+    return;
+  }
+
   netlifyIdentity.on('init', function(user) {
+    clearTimeout(identityTimer);
     if (!user) {
       netlifyIdentity.open('login');
+      // Dacă Identity nu e activat pe site, open() nu face nimic → layerele tot nu se încarcă
+      // Al doilea fallback după alte 3s
+      setTimeout(function() { _loadLayersOnce(); }, 3000);
     } else {
       _applyIdentityUser(user);
-      loadStaticLayers();
+      _loadLayersOnce();
     }
   });
+
   netlifyIdentity.on('login', function(user) {
     netlifyIdentity.close();
     _applyIdentityUser(user);
-    loadStaticLayers();
+    _loadLayersOnce();
+    renderTree();
   });
+
   netlifyIdentity.on('logout', function() {
     window._userIsAdmin = false;
+    _layersLoaded = false;
     netlifyIdentity.open('login');
   });
+
   netlifyIdentity.on('error', function(err) {
     console.error('Identity error', err);
+    clearTimeout(identityTimer);
+    _loadLayersOnce();
   });
 });
 </script>
