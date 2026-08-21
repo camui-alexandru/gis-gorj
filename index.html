@@ -478,19 +478,11 @@ if (typeof netlifyIdentity === 'undefined') {
     netlifyIdentity.close();
     _applyIdentityUser(user);
     _hideBackdrop();
-    if (_layersLoaded) {
-      window.location.reload(); // reload pentru rolul corect
-    } else {
-      _loadLayersOnce();
-    }
+    _loadLayersOnce();
   });
 
   netlifyIdentity.on('logout', function() {
-    window._userRole = null;
-    window._userIsAdmin = false;
-    _layersLoaded = false;
-    _showBackdrop();
-    netlifyIdentity.open('login');
+    window.location.reload();
   });
 
   netlifyIdentity.on('error', function(err) {
