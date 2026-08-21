@@ -340,6 +340,26 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
   }
 
+  /* Buton float adaugă strat */
+  #mob-upload-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:200px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    border:none;font-size:22px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
+  /* Buton float documentație urbanism */
+  #mob-ord904-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;bottom:260px;left:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--panel);color:var(--text);
+    border:1px solid var(--border);font-size:20px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+
   /* Status bar simplificat */
   .statusbar{font-size:10px;gap:8px;padding:0 8px;height:28px}
   .sb-item:nth-child(2),.sb-item:nth-child(3),.sb-item:nth-child(4){display:none}
@@ -586,6 +606,8 @@ if (typeof netlifyIdentity === 'undefined') {
   <div id="mob-backdrop" onclick="closeMobileSidebar()"></div>
   <button id="mob-layers-btn" onclick="toggleMobileSidebar()" style="display:none">☰</button>
   <button id="mob-search-btn" onclick="openCadSearch()" style="display:none">🔎</button>
+  <button id="mob-upload-btn" onclick="openUpload()" style="display:none" title="Adaugă strat">＋</button>
+  <button id="mob-ord904-btn" onclick="openOrd904()" style="display:none" title="Documentație Urbanism">📋</button>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
@@ -1595,6 +1617,8 @@ function closeMobileSidebar() {
     const isMob = window.innerWidth <= 767;
     document.getElementById('mob-layers-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-search-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-upload-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-ord904-btn').style.display = isMob ? 'flex' : 'none';
     if (!isMob) closeMobileSidebar();
   }
   checkMobile();
