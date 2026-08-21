@@ -385,32 +385,30 @@ function logout() {
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
 }
 
-window.addEventListener('DOMContentLoaded', function() {
-  // Fallback: dacă Identity nu răspunde în 5s, încarcă layerele (fără PATJ)
-  var identityTimer = setTimeout(function() {
-    console.warn('Netlify Identity nu s-a inițializat — fallback fără auth');
-    var el = document.getElementById('userDisplay');
-    if (el && el.textContent === '—') el.textContent = 'Vizitator';
-    _loadLayersOnce();
-  }, 5000);
+// ── Înregistrăm handlerii IMEDIAT (nu în DOMContentLoaded) ca să nu pierdem
+//    evenimentul 'init' care poate fi emis înainte ca DOM-ul să fie gata.
+var _identityTimer = setTimeout(function() {
+  console.warn('Netlify Identity timeout — fallback Vizitator');
+  var el = document.getElementById('userDisplay');
+  if (el) el.textContent = 'Vizitator';
+  _loadLayersOnce();
+}, 6000);
 
-  if (typeof netlifyIdentity === 'undefined') {
-    // Scriptul CDN nu s-a încărcat
-    clearTimeout(identityTimer);
+if (typeof netlifyIdentity === 'undefined') {
+  clearTimeout(_identityTimer);
+  document.addEventListener('DOMContentLoaded', function() {
     var el = document.getElementById('userDisplay');
     if (el) el.textContent = 'Vizitator';
-    _loadLayersOnce();
-    return;
-  }
-
+  });
+  window.addEventListener('load', _loadLayersOnce);
+} else {
   netlifyIdentity.on('init', function(user) {
-    clearTimeout(identityTimer);
+    clearTimeout(_identityTimer);
     if (!user) {
-      // Identity e activ dar userul nu e logat — arată modalul de login
       netlifyIdentity.open('login');
-      // Nu încărcăm layerele — userul trebuie să se autentifice
     } else {
-      _applyIdentityUser(user);
+      document.addEventListener('DOMContentLoaded', function() { _applyIdentityUser(user); });
+      if (document.readyState !== 'loading') _applyIdentityUser(user);
       _loadLayersOnce();
     }
   });
@@ -419,10 +417,8 @@ window.addEventListener('DOMContentLoaded', function() {
     netlifyIdentity.close();
     _applyIdentityUser(user);
     if (_layersLoaded) {
-      // Layerele au fost încărcate via fallback (fără PATJ)
-      // Dacă e admin, reîncărcăm pagina ca să primim și layerele PATJ
       if (window._userIsAdmin) { window.location.reload(); return; }
-      renderTree(); // User simplu — actualizăm doar sidebar-ul
+      renderTree();
     } else {
       _loadLayersOnce();
     }
@@ -436,10 +432,10 @@ window.addEventListener('DOMContentLoaded', function() {
 
   netlifyIdentity.on('error', function(err) {
     console.error('Identity error', err);
-    clearTimeout(identityTimer);
+    clearTimeout(_identityTimer);
     _loadLayersOnce();
   });
-});
+}
 </script>
 
 <!-- ── TOPBAR ─────────────────────────────────────────────────── -->
