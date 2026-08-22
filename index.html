@@ -362,7 +362,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 
   /* Butoane flotante măsurare — dreapta jos */
   #mob-meas-dist-btn,#mob-meas-area-btn{
-    display:flex;align-items:center;justify-content:center;
+    display:flex!important;align-items:center;justify-content:center;
     position:fixed;right:12px;
     width:48px;height:48px;border-radius:50%;
     background:var(--panel);color:var(--text);
@@ -399,6 +399,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   .overlay{align-items:flex-end}
   .search-modal{width:100%!important}
 }
+
+#mob-meas-dist-btn,#mob-meas-area-btn{display:none}
 
 /* ── LEAFLET OVERRIDES ─────────────────────────────────────────── */
 .leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important}
@@ -624,8 +626,8 @@ if (typeof netlifyIdentity === 'undefined') {
   <button id="mob-search-btn" onclick="openCadSearch()" style="display:none">🔎</button>
   <button id="mob-upload-btn" onclick="openUpload()" style="display:none" title="Adaugă strat">＋</button>
   <button id="mob-ord904-btn" onclick="openOrd904()" style="display:none" title="Documentație Urbanism">📋</button>
-  <button id="mob-meas-dist-btn" onclick="setTool('measDist');_mobSyncMeasBtns()" style="display:none" title="Măsoară distanță">📏</button>
-  <button id="mob-meas-area-btn" onclick="setTool('measArea');_mobSyncMeasBtns()" style="display:none" title="Măsoară suprafață">⬡</button>
+  <button id="mob-meas-dist-btn" onclick="setTool('measDist');_mobSyncMeasBtns()" title="Măsoară distanță">📏</button>
+  <button id="mob-meas-area-btn" onclick="setTool('measArea');_mobSyncMeasBtns()" title="Măsoară suprafață">⬡</button>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
@@ -1637,8 +1639,6 @@ function closeMobileSidebar() {
     document.getElementById('mob-search-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-upload-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-ord904-btn').style.display = isMob ? 'flex' : 'none';
-    document.getElementById('mob-meas-dist-btn').style.display = isMob ? 'flex' : 'none';
-    document.getElementById('mob-meas-area-btn').style.display = isMob ? 'flex' : 'none';
     if (!isMob) closeMobileSidebar();
   }
   checkMobile();
