@@ -53,9 +53,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .btn-add{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
 .btn-add:hover{background:#1a6fef}
 .coord-display{font-size:11px;color:var(--muted);font-family:monospace;min-width:180px;text-align:right}
-.user-badge{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--text);white-space:nowrap}
-.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;white-space:nowrap;transition:.15s;font-family:inherit}
-.btn-logout:hover{background:rgba(231,76,60,.12);color:var(--red);border-color:rgba(231,76,60,.4)}
+.user-menu-wrap{position:relative;flex-shrink:0}
+.user-badge{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--text);white-space:nowrap;cursor:pointer;user-select:none;transition:border-color .15s}
+.user-badge:hover{border-color:var(--accent)}
+.user-dropdown{display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:180px;background:var(--panel);border:1px solid var(--border);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:9999;overflow:hidden}
+.user-menu-wrap.open .user-dropdown{display:block}
+.user-dropdown button{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer;text-align:left;font-family:inherit;transition:background .12s}
+.user-dropdown button:hover{background:var(--panel2)}
+.user-dropdown .ud-danger{color:var(--red)}
+.user-dropdown .ud-danger:hover{background:rgba(231,76,60,.1)}
+.user-dropdown hr{border:none;border-top:1px solid var(--border);margin:4px 0}
 
 /* ── MAIN ──────────────────────────────────────────────────────── */
 .main{display:flex;flex:1;overflow:hidden;position:relative}
@@ -295,8 +302,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   #ord904Btn{display:none}
   .tool-btn{padding:6px 8px;font-size:12px}
   .user-badge{font-size:11px;padding:3px 8px;max-width:180px;overflow:hidden}
-  .user-badge span#userDisplay{overflow:hidden;text-overflow:ellipsis;max-width:100px}
-  .btn-logout{padding:5px 8px;font-size:11px}
+  .user-badge span#userDisplay{overflow:hidden;text-overflow:ellipsis;max-width:90px}
+  .user-dropdown{right:0}
   #mob-basemap-row{display:flex!important}
 
   /* Sidebar ca drawer overlay */
@@ -473,7 +480,21 @@ function _hideBackdrop() {
 }
 
 function logout() {
+  closeUserMenu();
   if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.logout();
+}
+
+function toggleUserMenu() {
+  var w = document.getElementById('userMenuWrap');
+  if (w) w.classList.toggle('open');
+}
+function closeUserMenu() {
+  var w = document.getElementById('userMenuWrap');
+  if (w) w.classList.remove('open');
+}
+function changePassword() {
+  closeUserMenu();
+  if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.open('signup');
 }
 
 function _showLoginBtn() {
@@ -574,8 +595,18 @@ if (typeof netlifyIdentity === 'undefined') {
     <button class="btn-add" onclick="openUpload()">＋ Adaugă strat</button>
     <div class="coord-display" id="coordDisplay">—</div>
     <div class="tool-sep"></div>
-    <div class="user-badge">👤 <span id="userDisplay">—</span> <span id="userRoleBadge" style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;color:#fff;margin-left:4px;background:#2980b9"></span></div>
-    <button class="btn-logout" onclick="logout()" title="Deconectare">⏻ Ieșire</button>
+    <div class="user-menu-wrap" id="userMenuWrap">
+      <div class="user-badge" onclick="toggleUserMenu()" title="Contul meu">
+        👤 <span id="userDisplay">—</span>
+        <span id="userRoleBadge" style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;color:#fff;margin-left:4px;background:#2980b9"></span>
+        <span style="font-size:9px;margin-left:2px;opacity:.6">▼</span>
+      </div>
+      <div class="user-dropdown">
+        <button onclick="changePassword()">🔑 Schimbă parola</button>
+        <hr>
+        <button class="ud-danger" onclick="logout()">⏻ Deconectare</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1472,8 +1503,9 @@ function applyColor(c) {
   colorPopupTarget = null;
 }
 
-document.addEventListener('click', () => {
+document.addEventListener('click', (e) => {
   document.getElementById('colorPopup').classList.add('hidden');
+  if (!e.target.closest('#userMenuWrap')) closeUserMenu();
 });
 
 // ═══════════════════════════════════════════════════════════════════
