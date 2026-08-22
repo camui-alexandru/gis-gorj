@@ -494,7 +494,65 @@ function closeUserMenu() {
 }
 function changePassword() {
   closeUserMenu();
-  if (typeof netlifyIdentity !== 'undefined') netlifyIdentity.open('signup');
+  document.getElementById('cpOld').value = '';
+  document.getElementById('cpNew1').value = '';
+  document.getElementById('cpNew2').value = '';
+  var msg = document.getElementById('cpMsg');
+  msg.style.display = 'none';
+  document.getElementById('chpwdModal').classList.remove('hidden');
+}
+function closeChangePwd() {
+  document.getElementById('chpwdModal').classList.add('hidden');
+}
+async function submitChangePwd() {
+  var oldPwd  = document.getElementById('cpOld').value;
+  var newPwd1 = document.getElementById('cpNew1').value;
+  var newPwd2 = document.getElementById('cpNew2').value;
+  var msg     = document.getElementById('cpMsg');
+  var btn     = document.getElementById('cpBtn');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.display = 'block';
+    msg.style.background = ok ? 'rgba(46,204,113,.15)' : 'rgba(231,76,60,.15)';
+    msg.style.color = ok ? '#2ecc71' : 'var(--red)';
+    msg.style.border = '1px solid ' + (ok ? 'rgba(46,204,113,.3)' : 'rgba(231,76,60,.3)');
+  }
+
+  if (!oldPwd || !newPwd1 || !newPwd2) { showMsg('Completează toate câmpurile.', false); return; }
+  if (newPwd1 !== newPwd2) { showMsg('Parolele noi nu coincid.', false); return; }
+  if (newPwd1.length < 8) { showMsg('Parola nouă trebuie să aibă cel puțin 8 caractere.', false); return; }
+
+  btn.disabled = true; btn.textContent = 'Se procesează...';
+
+  try {
+    var user = typeof netlifyIdentity !== 'undefined' && netlifyIdentity.currentUser();
+    if (!user) { showMsg('Nu ești autentificat.', false); btn.disabled=false; btn.textContent='Salvează parola'; return; }
+
+    // Verifică parola veche prin re-autentificare
+    var tokenResp = await fetch('/.netlify/identity/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=password&username=' + encodeURIComponent(user.email) + '&password=' + encodeURIComponent(oldPwd)
+    });
+    if (!tokenResp.ok) { showMsg('Parola curentă este incorectă.', false); btn.disabled=false; btn.textContent='Salvează parola'; return; }
+    var tokenData = await tokenResp.json();
+
+    // Schimbă parola cu noul token
+    var updateResp = await fetch('/.netlify/identity/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tokenData.access_token },
+      body: JSON.stringify({ password: newPwd1 })
+    });
+    if (!updateResp.ok) { showMsg('Eroare la schimbarea parolei. Încearcă din nou.', false); btn.disabled=false; btn.textContent='Salvează parola'; return; }
+
+    showMsg('Parola a fost schimbată cu succes!', true);
+    btn.textContent = 'Salvează parola';
+    setTimeout(closeChangePwd, 2000);
+  } catch(e) {
+    showMsg('Eroare de rețea. Încearcă din nou.', false);
+    btn.disabled=false; btn.textContent='Salvează parola';
+  }
 }
 
 function _showLoginBtn() {
@@ -655,6 +713,32 @@ if (typeof netlifyIdentity === 'undefined') {
   <button id="mob-ord904-btn" onclick="openOrd904()" style="display:none" title="Documentație Urbanism">📋</button>
   <button id="mob-meas-dist-btn" onclick="setTool('measDist');_mobSyncMeasBtns()" title="Măsoară distanță">📏</button>
   <button id="mob-meas-area-btn" onclick="setTool('measArea');_mobSyncMeasBtns()" title="Măsoară suprafață">⬡</button>
+
+  <!-- CHANGE PASSWORD MODAL -->
+  <div class="overlay hidden" id="chpwdModal" onclick="if(event.target===this)closeChangePwd()">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-hdr">
+        <h2>Schimbă parola</h2>
+        <button class="btn-x" onclick="closeChangePwd()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:20px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:12px;color:var(--muted)">Parola curentă</label>
+          <input type="password" id="cpOld" class="layer-input" placeholder="Parola curentă" autocomplete="current-password"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:12px;color:var(--muted)">Parola nouă</label>
+          <input type="password" id="cpNew1" class="layer-input" placeholder="Parola nouă" autocomplete="new-password"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:12px;color:var(--muted)">Confirmă parola nouă</label>
+          <input type="password" id="cpNew2" class="layer-input" placeholder="Confirmă parola nouă" autocomplete="new-password"/>
+        </div>
+        <div id="cpMsg" style="font-size:12px;display:none;padding:8px 10px;border-radius:5px"></div>
+        <button id="cpBtn" class="btn-add" style="width:100%;justify-content:center" onclick="submitChangePwd()">Salvează parola</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
