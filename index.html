@@ -499,6 +499,8 @@ function changePassword() {
   document.getElementById('cpNew2').value = '';
   var msg = document.getElementById('cpMsg');
   msg.style.display = 'none';
+  var btn = document.getElementById('cpBtn');
+  btn.disabled = false; btn.textContent = 'Salvează parola';
   document.getElementById('chpwdModal').classList.remove('hidden');
 }
 function closeChangePwd() {
@@ -547,7 +549,7 @@ async function submitChangePwd() {
     if (!updateResp.ok) { showMsg('Eroare la schimbarea parolei. Încearcă din nou.', false); btn.disabled=false; btn.textContent='Salvează parola'; return; }
 
     showMsg('Parola a fost schimbată cu succes!', true);
-    btn.textContent = 'Salvează parola';
+    btn.disabled = false; btn.textContent = 'Salvează parola';
     setTimeout(closeChangePwd, 2000);
   } catch(e) {
     showMsg('Eroare de rețea. Încearcă din nou.', false);
