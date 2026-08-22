@@ -360,6 +360,22 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
   }
 
+  /* Butoane flotante măsurare — dreapta jos */
+  #mob-meas-dist-btn,#mob-meas-area-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;right:12px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--panel);color:var(--text);
+    border:1px solid var(--border);font-size:20px;cursor:pointer;
+    z-index:1500;box-shadow:0 4px 14px rgba(0,0,0,.5);
+    transition:background .15s,border-color .15s;
+  }
+  #mob-meas-dist-btn{bottom:80px}
+  #mob-meas-area-btn{bottom:140px}
+  #mob-meas-dist-btn.active,#mob-meas-area-btn.active{
+    background:var(--accent);border-color:var(--accent);color:#fff;
+  }
+
   /* Status bar simplificat */
   .statusbar{font-size:10px;gap:8px;padding:0 8px;height:28px}
   .sb-item:nth-child(2),.sb-item:nth-child(3),.sb-item:nth-child(4){display:none}
@@ -608,6 +624,8 @@ if (typeof netlifyIdentity === 'undefined') {
   <button id="mob-search-btn" onclick="openCadSearch()" style="display:none">🔎</button>
   <button id="mob-upload-btn" onclick="openUpload()" style="display:none" title="Adaugă strat">＋</button>
   <button id="mob-ord904-btn" onclick="openOrd904()" style="display:none" title="Documentație Urbanism">📋</button>
+  <button id="mob-meas-dist-btn" onclick="setTool('measDist');_mobSyncMeasBtns()" style="display:none" title="Măsoară distanță">📏</button>
+  <button id="mob-meas-area-btn" onclick="setTool('measArea');_mobSyncMeasBtns()" style="display:none" title="Măsoară suprafață">⬡</button>
 
   <!-- ATTRIBUTE PANEL -->
   <div class="attr-panel hidden" id="attrPanel">
@@ -1619,11 +1637,23 @@ function closeMobileSidebar() {
     document.getElementById('mob-search-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-upload-btn').style.display = isMob ? 'flex' : 'none';
     document.getElementById('mob-ord904-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-meas-dist-btn').style.display = isMob ? 'flex' : 'none';
+    document.getElementById('mob-meas-area-btn').style.display = isMob ? 'flex' : 'none';
     if (!isMob) closeMobileSidebar();
   }
   checkMobile();
   window.addEventListener('resize', checkMobile);
 })();
+
+function _mobSyncMeasBtns() {
+  var distBtn = document.getElementById('mob-meas-dist-btn');
+  var areaBtn = document.getElementById('mob-meas-area-btn');
+  if (!distBtn || !areaBtn) return;
+  var active = document.getElementById('toolMeasDist') && document.getElementById('toolMeasDist').classList.contains('active');
+  var activeArea = document.getElementById('toolMeasArea') && document.getElementById('toolMeasArea').classList.contains('active');
+  distBtn.classList.toggle('active', active);
+  areaBtn.classList.toggle('active', activeArea);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // UPLOAD MODAL
