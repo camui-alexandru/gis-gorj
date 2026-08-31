@@ -787,8 +787,9 @@ if (typeof netlifyIdentity === 'undefined') {
       <div class="form-row">
         <label>Sistem de coordonate (CRS)</label>
         <select id="crsSelect">
-          <option value="auto">🔍 Detectare automată (recomandat)</option>
-          <option value="stereo70">📐 Stereo70 — EPSG:31700 (sistem românesc)</option>
+          <option value="stereo3844" selected>📐 EPSG:3844 — Stereo70 (implicit)</option>
+          <option value="auto">🔍 Detectare automată</option>
+          <option value="stereo70">📐 EPSG:31700 — Stereo70 (vechi)</option>
           <option value="wgs84">🌐 WGS84 — EPSG:4326 (lat/lon)</option>
           <option value="web">🗺 Web Mercator — EPSG:3857</option>
         </select>
@@ -1888,6 +1889,7 @@ function setProgress(p) { document.getElementById('progressFill').style.width = 
 // ═══════════════════════════════════════════════════════════════════
 async function applyProjection(fc, crs, prjText) {
   if (crs === 'wgs84') return fc;
+  if (crs === 'stereo3844') return await reprojectAsync(fc, 'EPSG:3844');
   if (crs === 'stereo70') return await reprojectAsync(fc, 'EPSG:31700');
   if (crs === 'web')     return await reprojectAsync(fc, 'EPSG:3857');
   // auto
@@ -1918,7 +1920,11 @@ async function parseShpZip(file, crs = 'auto') {
   let fc = Array.isArray(result)
     ? { type:'FeatureCollection', features: result.flatMap(r => r.features||[]) }
     : result;
-  return applyProjection(fc, crs, null);
+  // shpjs auto-reprojectează din .prj dacă există → detectăm dacă datele sunt deja WGS84
+  // pentru a evita dubla reproiecție (care ar muta stratul complet greșit)
+  const sample = sampleCoord(fc);
+  const alreadyWgs84 = sample && Math.abs(sample.x) <= 180 && Math.abs(sample.y) <= 90;
+  return applyProjection(fc, alreadyWgs84 ? 'wgs84' : crs, null);
 }
 
 // Stereo70 (EPSG:31700) cu parametrii datum shift oficiali România
