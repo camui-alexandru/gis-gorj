@@ -1916,12 +1916,36 @@ async function parseShpFiles(shpFile, dbfFile, prjFile, crs = 'auto') {
 
 async function parseShpZip(file, crs = 'auto') {
   const buf = await file.arrayBuffer();
+
+  // Extragem manual din ZIP pentru a controla reproiecția (shpjs.shp() auto-reproiectează
+  // intern cu parametrii EPSG:31700, ceea ce dă ~120m offset pentru fișiere EPSG:3844)
+  let shpBuf = null, dbfBuf = null, prjText = null;
+  try {
+    const zip = await JSZip.loadAsync(buf);
+    for (const [name, entry] of Object.entries(zip.files)) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (ext === 'shp') shpBuf = await entry.async('arraybuffer');
+      else if (ext === 'dbf') dbfBuf = await entry.async('arraybuffer');
+      else if (ext === 'prj') prjText = await entry.async('string');
+    }
+  } catch(e) { /* JSZip indisponibil → fallback la shpjs */ }
+
+  if (shpBuf) {
+    // Parsăm coordonatele brute fără auto-reproiecție
+    const geoms = shp.parseShp(shpBuf);
+    let features = geoms.map(g => ({ type:'Feature', geometry:g, properties:{} }));
+    if (dbfBuf) {
+      const attrs = shp.parseDbf(dbfBuf);
+      features = features.map((f, i) => ({ ...f, properties: attrs[i] || {} }));
+    }
+    return applyProjection({ type:'FeatureCollection', features }, crs, prjText);
+  }
+
+  // Fallback la shpjs dacă JSZip a eșuat
   const result = await shp(buf);
   let fc = Array.isArray(result)
     ? { type:'FeatureCollection', features: result.flatMap(r => r.features||[]) }
     : result;
-  // shpjs auto-reprojectează din .prj dacă există → detectăm dacă datele sunt deja WGS84
-  // pentru a evita dubla reproiecție (care ar muta stratul complet greșit)
   const sample = sampleCoord(fc);
   const alreadyWgs84 = sample && Math.abs(sample.x) <= 180 && Math.abs(sample.y) <= 90;
   return applyProjection(fc, alreadyWgs84 ? 'wgs84' : crs, null);
