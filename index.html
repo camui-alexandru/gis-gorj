@@ -680,7 +680,7 @@ if (typeof netlifyIdentity === 'undefined') {
       <span id="totalCount" style="font-size:11px;color:var(--muted)">0 straturi</span>
     </div>
     <div class="sb-search">
-      <input type="text" id="layerSearch" placeholder="🔍 Caută strat..." oninput="filterLayers(this.value)" autocomplete="off"/>
+      <input type="text" id="layerSearch" placeholder="🔍 Caută strat..." oninput="filterLayers(this.value)" autocomplete="nope" readonly onfocus="this.removeAttribute('readonly')"/>
     </div>
     <div class="layer-tree" id="layerTree"></div>
     <div class="sb-footer">
@@ -1015,6 +1015,8 @@ let measurePoints = [];
 let isMeasuring = false;
 let colorPopupTarget = null;
 let filterText = '';
+// Chrome ignoră autocomplete="off" — forțăm golirea câmpului de search după load
+window.addEventListener('load', () => { const s = document.getElementById('layerSearch'); if(s){s.value='';} });
 
 const SWATCHES = ['#2a7fff','#1db8c2','#2ecc71','#e8a838','#e74c3c','#9b59b6',
                   '#f39c12','#1abc9c','#3498db','#e74c3c','#f1c40f','#95a5a6',
