@@ -1920,7 +1920,11 @@ async function parseShpZip(file, crs = 'auto') {
   let fc = Array.isArray(result)
     ? { type:'FeatureCollection', features: result.flatMap(r => r.features||[]) }
     : result;
-  return applyProjection(fc, crs, null);
+  // shpjs auto-reprojectează din .prj dacă există → detectăm dacă datele sunt deja WGS84
+  // pentru a evita dubla reproiecție (care ar muta stratul complet greșit)
+  const sample = sampleCoord(fc);
+  const alreadyWgs84 = sample && Math.abs(sample.x) <= 180 && Math.abs(sample.y) <= 90;
+  return applyProjection(fc, alreadyWgs84 ? 'wgs84' : crs, null);
 }
 
 // Stereo70 (EPSG:31700) cu parametrii datum shift oficiali România
