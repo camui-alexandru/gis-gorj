@@ -1247,9 +1247,10 @@ function getNationalC(props) {
 function buildLeafletLayer(layer) {
   const withLabels = hasNationalC(layer);
   const rdr = layer._renderer || null;
+  const w = layer.weight || 1.5;
   const style = rdr
     ? f => rendererStyle(rdr, f, false)
-    : () => ({ color:layer.color, weight:1.5, opacity:.9, fillOpacity:.25, fillColor:layer.color });
+    : () => ({ color:layer.color, weight:w, opacity:.9, fillOpacity:.25, fillColor:layer.color });
   const ptLayer = (f, ll) => L.circleMarker(ll, { radius:6, color:layer.color, fillColor:layer.color, fillOpacity:.75, weight:2 });
 
   const onEach = (f, lyr) => {
@@ -1257,16 +1258,26 @@ function buildLeafletLayer(layer) {
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
       if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, true));
-      else this.setStyle && this.setStyle({ weight:3, opacity:1, fillOpacity:.45 });
+      else this.setStyle && this.setStyle({ weight:w+1.5, opacity:1, fillOpacity:.45 });
     });
     lyr.on('mouseout', function() {
       if (activeTool !== 'pan') return;
       if (rdr) this.setStyle && this.setStyle(rendererStyle(rdr, f, false));
-      else this.setStyle && this.setStyle({ weight:1.5, opacity:.9, fillOpacity:.25 });
+      else this.setStyle && this.setStyle({ weight:w, opacity:.9, fillOpacity:.25 });
     });
   };
 
-  const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach });
+  // Layere uploadate (ZIP) → pane dedicat cu z-index mai mare decât straturile de bază
+  let paneOpt = {};
+  if (layer.zFront) {
+    if (!map.getPane('uploadPane')) {
+      const p = map.createPane('uploadPane');
+      p.style.zIndex = 450;
+    }
+    paneOpt = { pane: 'uploadPane' };
+  }
+
+  const geojsonLayer = L.geoJSON(layer.geojson, { style, pointToLayer:ptLayer, onEachFeature:onEach, ...paneOpt });
   if (layer._withLabels === undefined) layer._withLabels = withLabels;
   return geojsonLayer;
 }
@@ -1834,6 +1845,10 @@ function setFiles(files) {
     document.getElementById('dropZone').classList.add('has-file');
     if (!document.getElementById('layerNameInput').value)
       document.getElementById('layerNameInput').value = selectedFile.name.replace(/\.(zip|dxf)$/i,'');
+    if (ext === 'zip') {
+      document.getElementById('colorInput').value = '#e74c3c';
+      document.getElementById('colorHex').textContent = '#e74c3c';
+    }
     document.getElementById('btnOk').disabled = false;
   } else {
     showErr('Format nesupitat. Folosiți .shp, .zip sau .dxf');
@@ -1859,7 +1874,7 @@ async function submitUpload() {
   const crs   = document.getElementById('crsSelect').value;
 
   try {
-    let geojson, format;
+    let geojson, format, weight = 2;
     setProgress(40);
     if (selectedFiles.shp) {
       geojson = await parseShpFiles(selectedFiles.shp, selectedFiles.dbf, selectedFiles.prj, crs);
@@ -1868,10 +1883,12 @@ async function submitUpload() {
       const ext = selectedFile.name.split('.').pop().toLowerCase();
       format = ext.toUpperCase();
       geojson = ext === 'zip' ? await parseShpZip(selectedFile, crs) : await parseDxf(selectedFile);
+      if (ext === 'zip') { weight = 3; }
     }
     setProgress(80);
     if (!geojson?.features?.length) throw new Error('Nicio entitate găsită în fișier.');
-    addLayer({ id:'l_'+Date.now(), name, cat, color, format, geojson, visible:true });
+    const isZip = format === 'ZIP';
+    addLayer({ id:'l_'+Date.now(), name, cat, color, weight, format, geojson, visible:true, zFront: isZip });
     setProgress(100);
     setTimeout(closeUpload, 350);
   } catch(err) {
