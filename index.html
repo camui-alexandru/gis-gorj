@@ -2579,7 +2579,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     ? f => rendererStyle(rdr, f, false, hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1))
     : () => { const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1); return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
   const onEach = (f, lyr) => {
-    lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); });
+    lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); if (!FGB_LAYERS[id]?._noAttr) showAttr(f, FGB_LAYERS[id]); });
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
       const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1);
@@ -2738,7 +2738,7 @@ async function loadStaticLayers() {
   // ── Cadastru ──────────────────────────────────────────────────────
   createFgbLayer('static_parcele',     'Parcele',     '#ffaa55', 'DATA/PARCELE.fgb', { _withLabels: true });
   createFgbLayer('static_constructii', 'Construcții', '#d4690a', 'DATA/CONSTRUCTII.fgb');
-  createFgbLayer('static_uat_gorj',    'Limite UAT Gorj', '#e74c3c', 'DATA/UAT_GORJ.fgb', { minZoom:8, _withLabels:true, _labelField:'name', _labelMinZoom:9 });
+  createFgbLayer('static_uat_gorj',    'Limite UAT Gorj', '#e74c3c', 'DATA/UAT_GORJ.fgb', { minZoom:8, _withLabels:true, _labelField:'name', _labelMinZoom:9, _noAttr:true });
 
   // ── Rețele Transport (ordinea: TRANSELECTRICA, TRANSGAZ, ROMGAZ, OMV, CONPET) ──
   createFgbLayer('static_conpet',        'CONPET',         '#6c3483', 'DATA/CONPET.fgb',        { cat:'transport', minZoom:9 });
