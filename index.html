@@ -2632,8 +2632,10 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     _renderer: rdr,
     _isPug: opts._isPug || false,
     _noIndex: opts._noIndex || false,
+    _noAttr: opts._noAttr || false,
     _opacity: opts._opacity ?? 1,
     _pane: opts._pane || null,
+    _ord904RegKey: opts._ord904RegKey || null,
     leafletLayer: geoLayer,
     fgbUrl
   };
