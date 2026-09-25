@@ -2595,7 +2595,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
   const hasPane = !!opts._pane;
   if (hasPane && !map.getPane(opts._pane)) {
     map.createPane(opts._pane);
-    map.getPane(opts._pane).style.zIndex = 401;
+    map.getPane(opts._pane).style.zIndex = String(opts._paneZ ?? 401);
     map.getPane(opts._pane).style.opacity = String(opts._opacity ?? 1);
   }
   const style = rdr
@@ -2953,24 +2953,37 @@ const ArcGISDynamic = L.Layer.extend({
 
   // ── PUG NOU — Motru ──────────────────────────────────────────────
   const MOTRU_GRP = { group:'motru', groupLabel:'Motru', groupColor:'#27ae60' };
-  createFgbLayer('pug_nou_motru_zfp', 'Zone Funcționale Propuse', '#27ae60',
-    'DATA/PUG_NOU/Motru_ZFPropusa.fgb',
-    { cat:'pug_nou', minZoom:11, _renderer: PUG_NOU_ZF_RENDERER, _noIndex:true, _opacity:0.6, ...MOTRU_GRP });
-  createFgbLayer('pug_nou_motru_lip', 'Limita Intravilan Propusă', '#e74c3c',
-    'DATA/PUG_NOU/Motru_IntPropusa.fgb',
-    { cat:'pug_nou', minZoom:10, _noIndex:true, ...MOTRU_GRP });
+  const PUG_NOU_REG_KEY = { general:'Cod_ZF', detail:'Cod_SZF' };
   createFgbLayer('pug_nou_motru_zfe', 'Zone Funcționale Existente', '#7f8c8d',
     'DATA/PUG_NOU/Motru_ZFExistenta.fgb',
-    { cat:'pug_nou', minZoom:11, _renderer: PUG_NOU_ZF_RENDERER, _noIndex:true, _opacity:0.45, ...MOTRU_GRP });
+    { cat:'pug_nou', minZoom:11, _renderer: PUG_NOU_ZF_RENDERER, _noIndex:true, _opacity:0.45,
+      _pane:'pugNouZFExisPane', _paneZ:461, _ord904RegKey: PUG_NOU_REG_KEY, ...MOTRU_GRP });
+  createFgbLayer('pug_nou_motru_zfp', 'Zone Funcționale Propuse', '#27ae60',
+    'DATA/PUG_NOU/Motru_ZFPropusa.fgb',
+    { cat:'pug_nou', minZoom:11, _renderer: PUG_NOU_ZF_RENDERER, _noIndex:true, _opacity:0.6,
+      _pane:'pugNouZFPropPane', _paneZ:462, _ord904RegKey: PUG_NOU_REG_KEY, ...MOTRU_GRP });
+  createFgbLayer('pug_nou_motru_lip', 'Limita Intravilan Propusă', '#e74c3c',
+    'DATA/PUG_NOU/Motru_IntPropusa.fgb',
+    { cat:'pug_nou', minZoom:10, _noIndex:true, _pane:'pugNouAuxPane', _paneZ:463, ...MOTRU_GRP });
   createFgbLayer('pug_nou_motru_lie', 'Limita Intravilan Existentă', '#95a5a6',
     'DATA/PUG_NOU/Motru_IntExistenta.fgb',
-    { cat:'pug_nou', minZoom:10, _noIndex:true, ...MOTRU_GRP });
+    { cat:'pug_nou', minZoom:10, _noIndex:true, _pane:'pugNouAuxPane', _paneZ:463, ...MOTRU_GRP });
   createFgbLayer('pug_nou_motru_cai', 'Căi de Comunicație', '#e67e22',
     'DATA/PUG_NOU/Motru_CaiCom.fgb',
-    { cat:'pug_nou', minZoom:11, _noIndex:true, ...MOTRU_GRP });
+    { cat:'pug_nou', minZoom:11, _noIndex:true, _pane:'pugNouAuxPane', _paneZ:463, ...MOTRU_GRP });
   createFgbLayer('pug_nou_motru_rte', 'Rețele Tehnico-Edilitare', '#3498db',
     'DATA/PUG_NOU/Motru_RTE.fgb',
-    { cat:'pug_nou', minZoom:11, _noIndex:true, ...MOTRU_GRP });
+    { cat:'pug_nou', minZoom:11, _noIndex:true, _pane:'pugNouAuxPane', _paneZ:463, ...MOTRU_GRP });
+
+  // Încarcă regulamentul Motru și îl atașează layerelor ZF
+  fetch('DATA/PUG_NOU/Motru_Reglementari.json')
+    .then(r => r.json())
+    .then(reg => {
+      ['pug_nou_motru_zfp','pug_nou_motru_zfe'].forEach(id => {
+        if (FGB_LAYERS[id]) FGB_LAYERS[id]._ord904Regulations = reg;
+      });
+    })
+    .catch(() => {});
 
   deferTreeRender = false;
   renderTree();
