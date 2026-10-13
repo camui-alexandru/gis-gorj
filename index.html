@@ -1697,8 +1697,6 @@ function showAttr(feature, layer) {
     const _pug = v => (v && v.toLowerCase() !== 'selectati') ? v : '';
     const utrAfisare = _a('utr_afisare');
     let utrPug = _pug(_a('utr_pug')) || _pug(_a('den_regulament'));
-    // Strip leading numeric session prefix (e.g. "1_musetesti_lr" → "musetesti_lr")
-    if (utrPug) utrPug = utrPug.replace(/^\d+_/, '');
     // Fallback: construiește zona din utr + utr_afisare (sau tip) când utr_pug lipsește
     if (!utrPug) {
       const TIP_ZONE = {'L1':'lr','L2':'lr','M':'m','M1':'m1','M2':'m2','M3':'m3',
