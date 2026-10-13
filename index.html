@@ -1697,6 +1697,8 @@ function showAttr(feature, layer) {
     const _pug = v => (v && v.toLowerCase() !== 'selectati') ? v : '';
     const utrAfisare = _a('utr_afisare');
     let utrPug = _pug(_a('utr_pug')) || _pug(_a('den_regulament'));
+    // Strip leading numeric session prefix (e.g. "1_musetesti_lr" → "musetesti_lr")
+    if (utrPug) utrPug = utrPug.replace(/^\d+_/, '');
     // Fallback: construiește zona din utr + utr_afisare (sau tip) când utr_pug lipsește
     if (!utrPug) {
       const TIP_ZONE = {'L1':'lr','L2':'lr','M':'m','M1':'m1','M2':'m2','M3':'m3',
@@ -2602,7 +2604,7 @@ function createFgbLayer(id, name, color, fgbUrl, opts) {
     ? f => rendererStyle(rdr, f, false, hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1))
     : () => { const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1); return { color, weight:1.2, opacity:op*.9, fillOpacity:op*.3, fillColor:color }; };
   const onEach = (f, lyr) => {
-    lyr.on('click', e => { if (activeTool !== 'pan') return; L.DomEvent.stopPropagation(e); if (!FGB_LAYERS[id]?._noAttr) showAttr(f, FGB_LAYERS[id]); });
+    lyr.on('click', e => { if (activeTool !== 'pan') return; if (!FGB_LAYERS[id]?._noAttr) { L.DomEvent.stopPropagation(e); showAttr(f, FGB_LAYERS[id]); } });
     lyr.on('mouseover', function() {
       if (activeTool !== 'pan') return;
       const op = hasPane ? 1 : (FGB_LAYERS[id]?._opacity ?? 1);
