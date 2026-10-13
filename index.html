@@ -3050,13 +3050,8 @@ const ArcGISDynamic = L.Layer.extend({
     }
 
     function openFallback(w) {
-      w.document.open();
-      w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Regim Tehnic – ' +
-        labelEsc + '</title><style>' + CSS + '</style></head><body>' +
-        '<div class="hdr"><span class="ic">ℹ</span> Regim Tehnic — ' + labelEsc + '</div>' +
-        '<div class="fw"><iframe src="' + htmlUrl + '"></iframe></div>' +
-        '</body></html>');
-      w.document.close();
+      // Navigate the popup directly to the server page to avoid X-Frame-Options blocking
+      w.location.href = htmlUrl;
     }
 
     var w = window.open('','_blank','width=960,height=750,scrollbars=yes,resizable=yes');
