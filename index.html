@@ -1706,6 +1706,8 @@ function showAttr(feature, layer) {
       const uatSlug = _a('utr').split(/[_\s\-]+/)[0].toLowerCase().replace(/[^a-z]/g,'');
       if (uatSlug && zoneSlug) utrPug = uatSlug + '_' + zoneSlug;
     }
+    // Mușetești CCR nu are regulament pe server
+    if (utrPug === 'musetesti_ccr') utrPug = '';
     const utr       = _a('utr');
     document.getElementById('attrHdr').style.borderLeftColor = '#8e44ad';
     document.getElementById('attrLayerName').textContent = utrAfisare || layer.name;
